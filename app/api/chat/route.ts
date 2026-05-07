@@ -12,7 +12,7 @@ import {
 } from '@/lib/db'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? '')
-const MODEL = process.env.GEMINI_MODEL ?? 'gemini-2.0-flash'
+const MODEL = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface ChatMessage {
