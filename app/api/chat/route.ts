@@ -62,14 +62,59 @@ async function logUnansweredQuery(query: string, reason: string) {
   }
 }
 
+// ── Helper: call Gemini with retry on 429 / RESOURCE_EXHAUSTED ────────────────
+async function callGeminiWithRetry(
+  query: string,
+  systemPrompt: string,
+  geminiHistory: { role: string; parts: { text: string }[] }[],
+  maxRetries = 3
+): Promise<string> {
+  const model = genAI.getGenerativeModel({
+    model: MODEL,
+    systemInstruction: systemPrompt,
+    generationConfig: {
+      temperature: 0.3,
+      maxOutputTokens: 2500,
+      responseMimeType: 'application/json',
+    },
+  })
+
+  let lastError: unknown = null
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const chat = model.startChat({ history: geminiHistory })
+      const result = await chat.sendMessage(query)
+      return result.response.text()
+    } catch (err: unknown) {
+      lastError = err
+      const msg = err instanceof Error ? err.message : ''
+      const isQuotaError = msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('429')
+      if (isQuotaError && attempt < maxRetries - 1) {
+        // Exponential backoff: 2s, 4s, 8s …
+        const delayMs = Math.pow(2, attempt + 1) * 1000
+        console.warn(`Gemini quota hit, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})`)
+        await new Promise(resolve => setTimeout(resolve, delayMs))
+        continue
+      }
+      throw err  // non-quota error or last attempt → propagate
+    }
+  }
+  throw lastError
+}
+
 // ── POST /api/chat ────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
+  let userEmail: string | undefined
+  let userQuery: string | undefined
+
   try {
     const body = await request.json()
     const { query, conversationHistory = [] } = body as {
       query: string
       conversationHistory?: ChatMessage[]
     }
+    userQuery = query
+    userEmail = body.email
 
     if (!query?.trim()) {
       return NextResponse.json({ error: 'Query is required' }, { status: 400 })
@@ -178,19 +223,8 @@ INSURANCE RULE: When intent is check_insurance, ALWAYS return a structuredResult
       parts: [{ text: m.content }],
     }))
 
-    const model = genAI.getGenerativeModel({
-      model: MODEL,
-      systemInstruction: systemPrompt,
-      generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: 2500,
-        responseMimeType: 'application/json',
-      },
-    })
-
-    const chat = model.startChat({ history: geminiHistory })
-    const result = await chat.sendMessage(query)
-    const raw = result.response.text()
+    // Call Gemini with automatic retry on quota errors
+    const raw = await callGeminiWithRetry(query, systemPrompt, geminiHistory)
 
     let parsed: ParsedAIResponse
     try {
@@ -242,6 +276,29 @@ INSURANCE RULE: When intent is check_insurance, ALWAYS return a structuredResult
     console.error('Chat API error:', error)
 
     const message = error instanceof Error ? error.message : 'Unknown error'
+
+    // ── ALWAYS save the user's message, even when the AI call fails ──────
+    if (userEmail && userQuery) {
+      try {
+        const existing = await getChatSession(userEmail)
+        const existingMessages = existing?.messages ?? []
+
+        const timestamp = Date.now()
+        const userMsg: DbChatMessage = { id: `u-${timestamp}`, type: 'user', content: userQuery, timestamp }
+
+        // Determine a human-friendly error reply to persist
+        let errorReply = "I'm sorry, something went wrong. Please try again."
+        if (message.includes('quota') || message.includes('RESOURCE_EXHAUSTED')) {
+          errorReply = "I'm temporarily overloaded. Please try again in a moment."
+        }
+        const aiMsg: DbChatMessage = { id: `a-${timestamp}`, type: 'assistant', content: errorReply, timestamp }
+
+        existingMessages.push(userMsg, aiMsg)
+        await saveChatSession(userEmail, existingMessages, new Date().toISOString())
+      } catch (saveErr) {
+        console.error('Failed to save chat history on error path:', saveErr)
+      }
+    }
 
     if (message.includes('API_KEY_INVALID') || message.includes('API key')) {
       return NextResponse.json(
