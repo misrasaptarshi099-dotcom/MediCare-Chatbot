@@ -1,0 +1,26 @@
+﻿node.exe : Invalid 
+project directory 
+provided, no such 
+directory: C:\Users\ind
+si\Downloads\Hospital\l
+int
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo 
+...
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (Invalid proje   
+ ct...s\Hospital\li    
+nt:String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 

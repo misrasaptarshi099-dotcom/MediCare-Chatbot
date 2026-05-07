@@ -1,0 +1,545 @@
+{
+  "doctors": [
+    {
+      "id": "doc-1",
+      "name": "Dr. Rajesh Mehta",
+      "specialty": "Orthopedic Surgery",
+      "department": "Orthopedics",
+      "departmentId": "dept-1",
+      "consultationFee": 150,
+      "roomNumber": "A-201",
+      "availability": {
+        "monday": [
+          "09:00",
+          "10:00",
+          "11:00",
+          "14:00",
+          "15:00",
+          "16:00"
+        ],
+        "tuesday": [
+          "09:00",
+          "10:00",
+          "11:00",
+          "14:00",
+          "15:00"
+        ],
+        "wednesday": [
+          "09:00",
+          "10:00",
+          "11:00"
+        ],
+        "thursday": [
+          "09:00",
+          "10:00",
+          "11:00",
+          "14:00",
+          "15:00",
+          "16:00"
+        ],
+        "friday": [
+          "09:00",
+          "10:00",
+          "11:00",
+          "14:00"
+        ],
+        "saturday": [
+          "10:00",
+          "11:00",
+          "12:00"
+        ],
+        "sunday": []
+      }
+    },
+    {
+      "id": "doc-2",
+      "name": "Dr. Priya Sharma",
+      "specialty": "Cardiology",
+      "department": "Cardiology",
+      "departmentId": "dept-2",
+      "consultationFee": 200,
+      "roomNumber": "B-105",
+      "availability": {
+        "monday": [
+          "08:00",
+          "09:00",
+          "10:00",
+          "11:00",
+          "14:00",
+          "15:00"
+        ],
+        "tuesday": [
+          "08:00",
+          "09:00",
+          "10:00",
+          "14:00",
+          "15:00",
+          "16:00"
+        ],
+        "wednesday": [
+          "08:00",
+          "09:00",
+          "10:00",
+          "11:00"
+        ],
+        "thursday": [
+          "08:00",
+          "09:00",
+          "10:00",
+          "14:00",
+          "15:00"
+        ],
+        "friday": [
+          "08:00",
+          "09:00",
+          "10:00",
+          "11:00",
+          "14:00"
+        ],
+        "saturday": [],
+        "sunday": []
+      }
+    },
+    {
+      "id": "doc-3",
+      "name": "Dr. Amit Patel",
+      "specialty": "Neurosurgery",
+      "department": "Neurology",
+      "departmentId": "dept-3",
+      "consultationFee": 250,
+      "roomNumber": "A-301",
+      "availability": {
+        "monday": [
+          "10:00",
+          "11:00",
+          "14:00",
+          "15:00"
+        ],
+        "tuesday": [
+          "10:00",
+          "11:00",
+          "14:00",
+          "15:00",
+          "16:00"
+        ],
+        "wednesday": [
+          "10:00",
+          "11:00"
+        ],
+        "thursday": [
+          "10:00",
+          "11:00",
+          "14:00",
+          "15:00"
+        ],
+        "friday": [
+          "10:00",
+          "11:00",
+          "14:00"
+        ],
+        "saturday": [],
+        "sunday": []
+      }
+    },
+    {
+      "id": "doc-4",
+      "name": "Dr. Sunita Reddy",
+      "specialty": "Pediatrics",
+      "department": "Pediatrics",
+      "departmentId": "dept-4",
+      "consultationFee": 120,
+      "roomNumber": "C-102",
+      "availability": {
+        "monday": [
+          "09:00",
+          "10:00",
+          "11:00",
+          "12:00",
+          "14:00",
+          "15:00",
+          "16:00"
+        ],
+        "tuesday": [
+          "09:00",
+          "10:00",
+          "11:00",
+          "14:00",
+          "15:00",
+          "16:00"
+        ],
+        "wednesday": [
+          "09:00",
+          "10:00",
+          "11:00",
+          "12:00",
+          "14:00",
+          "15:00"
+        ],
+        "thursday": [
+          "09:00",
+          "10:00",
+          "11:00",
+          "14:00",
+          "15:00",
+          "16:00"
+        ],
+        "friday": [
+          "09:00",
+          "10:00",
+          "11:00",
+          "14:00",
+          "15:00"
+        ],
+        "saturday": [
+          "09:00",
+          "10:00",
+          "11:00"
+        ],
+        "sunday": []
+      }
+    },
+    {
+      "id": "doc-5",
+      "name": "Dr. Vikram Singh",
+      "specialty": "Radiology",
+      "department": "Radiology",
+      "departmentId": "dept-5",
+      "consultationFee": 100,
+      "roomNumber": "A-001",
+      "availability": {
+        "monday": [
+          "08:00",
+          "09:00",
+          "10:00",
+          "11:00",
+          "12:00",
+          "14:00",
+          "15:00",
+          "16:00"
+        ],
+        "tuesday": [
+          "08:00",
+          "09:00",
+          "10:00",
+          "11:00",
+          "14:00",
+          "15:00",
+          "16:00"
+        ],
+        "wednesday": [
+          "08:00",
+          "09:00",
+          "10:00",
+          "11:00",
+          "12:00",
+          "14:00",
+          "15:00"
+        ],
+        "thursday": [
+          "08:00",
+          "09:00",
+          "10:00",
+          "11:00",
+          "14:00",
+          "15:00",
+          "16:00"
+        ],
+        "friday": [
+          "08:00",
+          "09:00",
+          "10:00",
+          "11:00",
+          "14:00",
+          "15:00"
+        ],
+        "saturday": [
+          "09:00",
+          "10:00",
+          "11:00",
+          "12:00"
+        ],
+        "sunday": []
+      }
+    },
+    {
+      "id": "doc-6",
+      "name": "Dr. Ananya Gupta",
+      "specialty": "Interventional Cardiology",
+      "department": "Cardiology",
+      "departmentId": "dept-2",
+      "consultationFee": 220,
+      "roomNumber": "B-107",
+      "availability": {
+        "monday": [
+          "09:00",
+          "10:00",
+          "11:00",
+          "15:00",
+          "16:00"
+        ],
+        "tuesday": [
+          "09:00",
+          "10:00",
+          "14:00",
+          "15:00"
+        ],
+        "wednesday": [
+          "09:00",
+          "10:00",
+          "11:00",
+          "14:00",
+          "15:00",
+          "16:00"
+        ],
+        "thursday": [
+          "09:00",
+          "10:00",
+          "11:00"
+        ],
+        "friday": [
+          "09:00",
+          "10:00",
+          "11:00",
+          "14:00",
+          "15:00"
+        ],
+        "saturday": [
+          "10:00",
+          "11:00"
+        ],
+        "sunday": []
+      }
+    },
+    {
+      "id": "doc-7",
+      "name": "Dr. Kiran Joshi",
+      "specialty": "Sports Medicine",
+      "department": "Orthopedics",
+      "departmentId": "dept-1",
+      "consultationFee": 180,
+      "roomNumber": "A-205",
+      "availability": {
+        "monday": [
+          "08:00",
+          "09:00",
+          "10:00",
+          "14:00",
+          "15:00",
+          "16:00",
+          "17:00"
+        ],
+        "tuesday": [
+          "08:00",
+          "09:00",
+          "10:00",
+          "11:00",
+          "14:00",
+          "15:00"
+        ],
+        "wednesday": [
+          "08:00",
+          "09:00",
+          "10:00",
+          "14:00",
+          "15:00",
+          "16:00"
+        ],
+        "thursday": [
+          "08:00",
+          "09:00",
+          "10:00",
+          "11:00",
+          "14:00",
+          "15:00"
+        ],
+        "friday": [
+          "08:00",
+          "09:00",
+          "10:00",
+          "14:00",
+          "15:00"
+        ],
+        "saturday": [
+          "09:00",
+          "10:00",
+          "11:00",
+          "12:00"
+        ],
+        "sunday": []
+      }
+    },
+    {
+      "id": "doc-8",
+      "name": "Dr. Neha Kapoor",
+      "specialty": "Pediatric Neurology",
+      "department": "Neurology",
+      "departmentId": "dept-3",
+      "consultationFee": 200,
+      "roomNumber": "A-305",
+      "availability": {
+        "monday": [
+          "09:00",
+          "10:00",
+          "11:00",
+          "14:00",
+          "15:00"
+        ],
+        "tuesday": [
+          "09:00",
+          "10:00",
+          "11:00",
+          "14:00",
+          "15:00",
+          "16:00"
+        ],
+        "wednesday": [
+          "09:00",
+          "10:00",
+          "11:00"
+        ],
+        "thursday": [
+          "09:00",
+          "10:00",
+          "11:00",
+          "14:00",
+          "15:00"
+        ],
+        "friday": [
+          "09:00",
+          "10:00",
+          "11:00",
+          "14:00"
+        ],
+        "saturday": [],
+        "sunday": []
+      }
+    },
+    {
+      "id": "doc-9",
+      "name": "Dr. Arjun Nair",
+      "specialty": "Diagnostic Radiology",
+      "department": "Radiology",
+      "departmentId": "dept-5",
+      "consultationFee": 110,
+      "roomNumber": "A-003",
+      "availability": {
+        "monday": [
+          "07:00",
+          "08:00",
+          "09:00",
+          "10:00",
+          "11:00",
+          "12:00"
+        ],
+        "tuesday": [
+          "07:00",
+          "08:00",
+          "09:00",
+          "10:00",
+          "11:00"
+        ],
+        "wednesday": [
+          "07:00",
+          "08:00",
+          "09:00",
+          "10:00",
+          "11:00",
+          "12:00"
+        ],
+        "thursday": [
+          "07:00",
+          "08:00",
+          "09:00",
+          "10:00",
+          "11:00"
+        ],
+        "friday": [
+          "07:00",
+          "08:00",
+          "09:00",
+          "10:00",
+          "11:00",
+          "12:00"
+        ],
+        "saturday": [
+          "08:00",
+          "09:00",
+          "10:00",
+          "11:00"
+        ],
+        "sunday": []
+      }
+    },
+    {
+      "id": "doc-10",
+      "name": "Dr. Meera Iyer",
+      "specialty": "Neonatology",
+      "department": "Pediatrics",
+      "departmentId": "dept-4",
+      "consultationFee": 150,
+      "roomNumber": "C-110",
+      "availability": {
+        "monday": [
+          "08:00",
+          "09:00",
+          "10:00",
+          "11:00",
+          "14:00",
+          "15:00"
+        ],
+        "tuesday": [
+          "08:00",
+          "09:00",
+          "10:00",
+          "14:00",
+          "15:00",
+          "16:00"
+        ],
+        "wednesday": [
+          "08:00",
+          "09:00",
+          "10:00",
+          "11:00",
+          "14:00"
+        ],
+        "thursday": [
+          "08:00",
+          "09:00",
+          "10:00",
+          "14:00",
+          "15:00"
+        ],
+        "friday": [
+          "08:00",
+          "09:00",
+          "10:00",
+          "11:00"
+        ],
+        "saturday": [
+          "09:00",
+          "10:00",
+          "11:00"
+        ],
+        "sunday": []
+      }
+    },
+    {
+      "id": "doc-1773118149673",
+      "name": "Dr. Lakshya Kachhara",
+      "specialty": "Orthopedic Surgery",
+      "department": "Orthopedics",
+      "departmentId": "dept-1",
+      "consultationFee": 50,
+      "roomNumber": "A-202",
+      "availability": {
+        "monday": [],
+        "tuesday": [],
+        "wednesday": [],
+        "thursday": [],
+        "friday": [],
+        "saturday": [],
+        "sunday": []
+      }
+    }
+  ]
+}

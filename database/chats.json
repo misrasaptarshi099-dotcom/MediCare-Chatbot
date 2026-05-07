@@ -1,0 +1,256 @@
+{
+  "sessions": [
+    {
+      "email": "misrasaptarshi099@gmail.com",
+      "messages": [
+        {
+          "id": "u-1773123116198",
+          "type": "user",
+          "content": "Which cardiologist is available tomorrow morning?",
+          "timestamp": 1773123116198
+        },
+        {
+          "id": "a-1773123116198",
+          "type": "assistant",
+          "content": "For tomorrow, Wednesday, March 11, 2026, we have the following cardiologists available in the morning:",
+          "timestamp": 1773123116198
+        },
+        {
+          "id": "u-1773123504438",
+          "type": "user",
+          "content": "cancel doctor Priya",
+          "timestamp": 1773123504438
+        },
+        {
+          "id": "a-1773123504438",
+          "type": "assistant",
+          "content": "I can help you with that. I found an appointment for you with Dr. Priya Sharma on 2026-03-11 at 9:00 AM for a General Consultation. Would you like to proceed with canceling this appointment?",
+          "timestamp": 1773123504438
+        },
+        {
+          "id": "u-1773123522256",
+          "type": "user",
+          "content": "reschedule Dr Priya to 12th March",
+          "timestamp": 1773123522256
+        },
+        {
+          "id": "a-1773123522256",
+          "type": "assistant",
+          "content": "Certainly! I can help you reschedule your appointment with Dr. Priya Sharma. On Thursday, March 12th, 2026, Dr. Priya Sharma has the following slots available: 8:00 AM, 9:00 AM, 10:00 AM, 2:00 PM, and 3:00 PM. Please let me know which time works best for you.",
+          "timestamp": 1773123522256
+        },
+        {
+          "id": "u-1773123557096",
+          "type": "user",
+          "content": "cancel Dr Priya",
+          "timestamp": 1773123557096
+        },
+        {
+          "id": "a-1773123557096",
+          "type": "assistant",
+          "content": "I can help you with that. I found an appointment for you with Dr. Priya Sharma on 2026-03-11 at 9:00 AM for a General Consultation. Would you like to proceed with canceling this appointment?",
+          "timestamp": 1773123557096
+        }
+      ],
+      "lastUpdated": "2026-03-10T06:19:17.096Z"
+    },
+    {
+      "email": "indrajit.sihi2025@vitstudent.ac.in",
+      "messages": [
+        {
+          "id": "u-1773123202158",
+          "type": "user",
+          "content": "priya sharma",
+          "timestamp": 1773123202158
+        },
+        {
+          "id": "a-1773123202158",
+          "type": "assistant",
+          "content": "Dr. Priya Sharma is a specialist in Cardiology, located in Room B-105. Her consultation fee is $200. Today, Tuesday, March 10, 2026, she has available slots at 8:00 AM, 9:00 AM, 10:00 AM, 2:00 PM, 3:00 PM, and 4:00 PM. Would you like to book an appointment?",
+          "timestamp": 1773123202158
+        },
+        {
+          "id": "u-1773123691930",
+          "type": "user",
+          "content": "cancel dr priya",
+          "timestamp": 1773123691930
+        },
+        {
+          "id": "a-1773123691930",
+          "type": "assistant",
+          "content": "I can help you with that. You have an appointment with Dr. Priya Sharma on March 11, 2026, at 9:00 AM for a General Consultation. Would you like to proceed with canceling this appointment?",
+          "timestamp": 1773123691930
+        },
+        {
+          "id": "u-1773123712306",
+          "type": "user",
+          "content": "reschedule",
+          "timestamp": 1773123712306
+        },
+        {
+          "id": "a-1773123712306",
+          "type": "assistant",
+          "content": "I can help you reschedule your appointment with Dr. Priya Sharma. Your current appointment is scheduled for March 11, 2026, at 9:00 AM. Dr. Priya Sharma has the following slots available today, March 10, 2026: 8:00 AM, 9:00 AM, 10:00 AM, 2:00 PM, 3:00 PM, and 4:00 PM. Please let me know which new time works best for you.",
+          "timestamp": 1773123712306
+        },
+        {
+          "id": "u-1773124425540",
+          "type": "user",
+          "content": "reschedule",
+          "timestamp": 1773124425540
+        },
+        {
+          "id": "a-1773124425540",
+          "type": "assistant",
+          "content": "To reschedule your appointment with Dr. Priya Sharma, please choose from her available slots today, March 10, 2026: 8:00 AM, 9:00 AM, 10:00 AM, 2:00 PM, 3:00 PM, and 4:00 PM. Which time would you prefer?",
+          "timestamp": 1773124425540
+        },
+        {
+          "id": "u-1773124444882",
+          "type": "user",
+          "content": "cancel",
+          "timestamp": 1773124444882
+        },
+        {
+          "id": "a-1773124444882",
+          "type": "assistant",
+          "content": "I can help you with that. You have an appointment with Dr. Priya Sharma on March 11, 2026, at 9:00 AM for a General Consultation. Would you like to proceed with canceling this appointment?",
+          "timestamp": 1773124444882
+        },
+        {
+          "id": "u-1773124498535",
+          "type": "user",
+          "content": "cancel",
+          "timestamp": 1773124498535
+        },
+        {
+          "id": "a-1773124498535",
+          "type": "assistant",
+          "content": "Your appointment with Dr. Priya Sharma on March 11, 2026, at 9:00 AM for a General Consultation has been successfully cancelled. If you need to book a new appointment, please let me know!",
+          "timestamp": 1773124498535
+        },
+        {
+          "id": "u-1773124918174",
+          "type": "user",
+          "content": "cancel booking",
+          "timestamp": 1773124918174
+        },
+        {
+          "id": "a-1773124918174",
+          "type": "assistant",
+          "content": "I can help you with that. You have an appointment with Dr. Priya Sharma on March 11, 2026, at 9:00 AM for a General Consultation. Would you like to proceed with canceling this appointment?",
+          "timestamp": 1773124918174
+        },
+        {
+          "id": "u-1773124958519",
+          "type": "user",
+          "content": "book appointment",
+          "timestamp": 1773124958519
+        },
+        {
+          "id": "a-1773124958519",
+          "type": "assistant",
+          "content": "I can help you book an appointment! Which doctor or department are you looking for, and what date would you prefer?",
+          "timestamp": 1773124958519
+        },
+        {
+          "id": "u-1773124968762",
+          "type": "user",
+          "content": "dr priya",
+          "timestamp": 1773124968762
+        },
+        {
+          "id": "a-1773124968762",
+          "type": "assistant",
+          "content": "Dr. Priya Sharma is a specialist in Cardiology, located in Room B-105. Her consultation fee is $200. Today, Tuesday, March 10, 2026, she has available slots at 8:00 AM, 9:00 AM, 10:00 AM, 2:00 PM, 3:00 PM, and 4:00 PM. Would you like to book an appointment?",
+          "timestamp": 1773124968762
+        },
+        {
+          "id": "u-1773125020539",
+          "type": "user",
+          "content": "cancel dr priya appointment",
+          "timestamp": 1773125020539
+        },
+        {
+          "id": "a-1773125020539",
+          "type": "assistant",
+          "content": "I can help you with that. You have an appointment with Dr. Priya Sharma today, March 10, 2026, at 4:00 PM for a General Consultation. Would you like to proceed with canceling this appointment?",
+          "timestamp": 1773125020539
+        },
+        {
+          "id": "u-1773125433082",
+          "type": "user",
+          "content": "cancel dr priya",
+          "timestamp": 1773125433082
+        },
+        {
+          "id": "a-1773125433082",
+          "type": "assistant",
+          "content": "I can help you with that. You have an appointment with Dr. Priya Sharma today, March 10, 2026, at 4:00 PM for a General Consultation. Would you like to proceed with canceling this appointment?",
+          "timestamp": 1773125433082
+        },
+        {
+          "id": "u-1773125464541",
+          "type": "user",
+          "content": "reschedule dr priya",
+          "timestamp": 1773125464541
+        },
+        {
+          "id": "a-1773125464541",
+          "type": "assistant",
+          "content": "I can help you reschedule your appointment with Dr. Priya Sharma. Your current appointment is scheduled for March 11, 2026, at 9:00 AM for a General Consultation. Dr. Priya Sharma has the following slots available today, March 10, 2026: 8:00 AM, 9:00 AM, 10:00 AM, 2:00 PM, 3:00 PM, and 4:00 PM. Please let me know which new time works best for you.",
+          "timestamp": 1773125464541
+        },
+        {
+          "id": "u-1773126781844",
+          "type": "user",
+          "content": "hi",
+          "timestamp": 1773126781844
+        },
+        {
+          "id": "a-1773126781844",
+          "type": "assistant",
+          "content": "Hello! How can I assist you today?",
+          "timestamp": 1773126781844
+        }
+      ],
+      "lastUpdated": "2026-03-10T07:13:01.844Z"
+    },
+    {
+      "email": "saptarshi.misra2025@vitstudent.ac.in",
+      "messages": [
+        {
+          "id": "u-1773123299553",
+          "type": "user",
+          "content": "Priya Sharma",
+          "timestamp": 1773123299553
+        },
+        {
+          "id": "a-1773123299553",
+          "type": "assistant",
+          "content": "Dr. Priya Sharma is a specialist in Cardiology and her consultation fee is $200. She is available today, Tuesday, March 10, 2026, at the following times: 8:00 AM, 9:00 AM, 10:00 AM, 2:00 PM, 3:00 PM, and 4:00 PM. She is located in Room B-105.",
+          "timestamp": 1773123299553
+        }
+      ],
+      "lastUpdated": "2026-03-10T06:14:59.553Z"
+    },
+    {
+      "email": "misrasaptarshi99@gmail.com",
+      "messages": [
+        {
+          "id": "u-1773123396100",
+          "type": "user",
+          "content": "Priya Sharma",
+          "timestamp": 1773123396100
+        },
+        {
+          "id": "a-1773123396100",
+          "type": "assistant",
+          "content": "Dr. Priya Sharma is a specialist in Cardiology, located in Room B-105. Her consultation fee is $200. Today, Tuesday, March 10, 2026, she has available slots at 8:00 AM, 9:00 AM, 10:00 AM, 2:00 PM, 3:00 PM, and 4:00 PM. Would you like to book an appointment?",
+          "timestamp": 1773123396100
+        }
+      ],
+      "lastUpdated": "2026-03-10T06:16:36.100Z"
+    }
+  ]
+}

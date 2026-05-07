@@ -1,0 +1,112 @@
+{
+  "services": [
+    {
+      "id": "knee-consultation",
+      "name": "Knee Consultation",
+      "department": "Orthopedics",
+      "departmentId": "dept-1",
+      "description": "Initial consultation for knee pain, injuries, or conditions",
+      "duration": 30,
+      "basePrice": 150
+    },
+    {
+      "id": "knee-surgery",
+      "name": "Knee Surgery",
+      "department": "Orthopedics",
+      "departmentId": "dept-1",
+      "description": "Surgical procedures for knee replacement or repair",
+      "duration": 180,
+      "basePrice": 15000
+    },
+    {
+      "id": "heart-checkup",
+      "name": "Heart Checkup",
+      "department": "Cardiology",
+      "departmentId": "dept-2",
+      "description": "Comprehensive cardiac evaluation including ECG and echocardiogram",
+      "duration": 60,
+      "basePrice": 300
+    },
+    {
+      "id": "heart-surgery",
+      "name": "Heart Surgery",
+      "department": "Cardiology",
+      "departmentId": "dept-2",
+      "description": "Cardiac surgical procedures including bypass and valve repair",
+      "duration": 300,
+      "basePrice": 50000
+    },
+    {
+      "id": "mri-scan",
+      "name": "MRI Scan",
+      "department": "Radiology",
+      "departmentId": "dept-5",
+      "description": "Magnetic Resonance Imaging for detailed body imaging",
+      "duration": 45,
+      "basePrice": 800
+    },
+    {
+      "id": "x-ray",
+      "name": "X-Ray",
+      "department": "Radiology",
+      "departmentId": "dept-5",
+      "description": "Standard X-ray imaging",
+      "duration": 15,
+      "basePrice": 100
+    },
+    {
+      "id": "ct-scan",
+      "name": "CT Scan",
+      "department": "Radiology",
+      "departmentId": "dept-5",
+      "description": "Computed Tomography scan for cross-sectional imaging",
+      "duration": 30,
+      "basePrice": 500
+    },
+    {
+      "id": "pediatric-checkup",
+      "name": "Pediatric Checkup",
+      "department": "Pediatrics",
+      "departmentId": "dept-4",
+      "description": "Routine health checkup for children",
+      "duration": 30,
+      "basePrice": 120
+    },
+    {
+      "id": "neuro-consultation",
+      "name": "Neurology Consultation",
+      "department": "Neurology",
+      "departmentId": "dept-3",
+      "description": "Initial consultation for neurological conditions",
+      "duration": 45,
+      "basePrice": 250
+    },
+    {
+      "id": "neuro-surgery",
+      "name": "Neurosurgery",
+      "department": "Neurology",
+      "departmentId": "dept-3",
+      "description": "Surgical procedures for brain and spine conditions",
+      "duration": 360,
+      "basePrice": 75000
+    },
+    {
+      "id": "ultrasound",
+      "name": "Ultrasound",
+      "department": "Radiology",
+      "departmentId": "dept-5",
+      "description": "Diagnostic ultrasound imaging",
+      "duration": 30,
+      "basePrice": 200
+    },
+    {
+      "id": "blood-test",
+      "name": "Blood Test",
+      "department": "Radiology",
+      "departmentId": "dept-5",
+      "description": "Comprehensive blood panel analysis",
+      "duration": 15,
+      "basePrice": 75
+    }
+  ]
+}

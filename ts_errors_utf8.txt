@@ -1,0 +1,4 @@
+﻿components/chat-interface.tsx(166,36): error TS2552: Cannot find name 'SpeechRecognitionEvent'. Did you mean 'SpeechRecognitionResult'?
+components/chat-interface.tsx(437,31): error TS2304: Cannot find name 'SpeechRecognition'.
+components/chat-interface.tsx(438,37): error TS2304: Cannot find name 'SpeechRecognition'.
+lib/openai.ts(1,20): error TS2307: Cannot find module 'openai' or its corresponding type declarations.

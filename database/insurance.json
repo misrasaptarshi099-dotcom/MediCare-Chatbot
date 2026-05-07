@@ -1,0 +1,68 @@
+{
+  "insurancePartners": [
+    {
+      "id": "ins-1",
+      "name": "ICICI Lombard",
+      "proceduresCovered": ["knee-consultation", "knee-surgery", "heart-checkup", "mri-scan", "x-ray", "pediatric-checkup"],
+      "coveragePercentage": 80,
+      "networkType": "Preferred",
+      "contactNumber": "+1-800-555-0001"
+    },
+    {
+      "id": "ins-2",
+      "name": "Star Health",
+      "proceduresCovered": ["knee-consultation", "heart-surgery", "heart-checkup", "ct-scan", "mri-scan", "pediatric-checkup", "neuro-consultation"],
+      "coveragePercentage": 75,
+      "networkType": "In-Network",
+      "contactNumber": "+1-800-555-0002"
+    },
+    {
+      "id": "ins-3",
+      "name": "HDFC Ergo",
+      "proceduresCovered": ["knee-consultation", "knee-surgery", "heart-surgery", "mri-scan", "x-ray", "ct-scan"],
+      "coveragePercentage": 85,
+      "networkType": "Preferred",
+      "contactNumber": "+1-800-555-0003"
+    },
+    {
+      "id": "ins-4",
+      "name": "Max Bupa",
+      "proceduresCovered": ["heart-checkup", "heart-surgery", "pediatric-checkup", "neuro-consultation", "neuro-surgery"],
+      "coveragePercentage": 70,
+      "networkType": "In-Network",
+      "contactNumber": "+1-800-555-0004"
+    },
+    {
+      "id": "ins-5",
+      "name": "Bajaj Allianz",
+      "proceduresCovered": ["knee-consultation", "knee-surgery", "mri-scan", "x-ray", "ct-scan", "ultrasound"],
+      "coveragePercentage": 80,
+      "networkType": "Preferred",
+      "contactNumber": "+1-800-555-0005"
+    },
+    {
+      "id": "ins-6",
+      "name": "New India Assurance",
+      "proceduresCovered": ["knee-consultation", "heart-checkup", "pediatric-checkup", "x-ray", "blood-test"],
+      "coveragePercentage": 65,
+      "networkType": "In-Network",
+      "contactNumber": "+1-800-555-0006"
+    },
+    {
+      "id": "ins-7",
+      "name": "Reliance General",
+      "proceduresCovered": ["knee-surgery", "heart-surgery", "neuro-surgery", "mri-scan", "ct-scan"],
+      "coveragePercentage": 75,
+      "networkType": "Preferred",
+      "contactNumber": "+1-800-555-0007"
+    },
+    {
+      "id": "ins-8",
+      "name": "Tata AIG",
+      "proceduresCovered": ["knee-consultation", "knee-surgery", "heart-checkup", "heart-surgery", "mri-scan", "x-ray", "pediatric-checkup", "neuro-consultation"],
+      "coveragePercentage": 90,
+      "networkType": "Preferred",
+      "contactNumber": "+1-800-555-0008"
+    }
+  ]
+}

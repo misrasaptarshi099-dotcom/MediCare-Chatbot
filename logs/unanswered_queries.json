@@ -1,0 +1,124 @@
+{
+  "queries": [
+    {
+      "id": "q-1773069159692",
+      "query": "what is 5+5",
+      "reason": "Cannot answer general knowledge questions outside of hospital services.",
+      "timestamp": "2026-03-09T15:12:39.692Z"
+    },
+    {
+      "id": "q-1773071827097",
+      "query": "I feel pain in my breast and I can feel lumps over there who do you think I should visit for a consultation",
+      "reason": "Medical advice requested; cannot diagnose or recommend based on symptoms. User needs to consult a healthcare professional for diagnosis.",
+      "timestamp": "2026-03-09T15:57:07.097Z"
+    },
+    {
+      "id": "q-1773071935519",
+      "query": "which one should i choose",
+      "reason": "Cannot provide medical advice or recommend a specific doctor based on symptoms or preference.",
+      "timestamp": "2026-03-09T15:58:55.519Z"
+    },
+    {
+      "id": "q-1773072747973",
+      "query": "i have been experiencing sever fever since 2 days and am confused about what i should do please assist me",
+      "reason": "The user is asking for medical advice regarding symptoms, which is outside the scope of this AI's capabilities. It requires a medical professional.",
+      "timestamp": "2026-03-09T16:12:27.973Z"
+    },
+    {
+      "id": "q-1773072775815",
+      "query": "which department should i consult",
+      "reason": "Cannot provide medical advice or recommend a department based on symptoms.",
+      "timestamp": "2026-03-09T16:12:55.815Z"
+    },
+    {
+      "id": "q-1773072814860",
+      "query": "i have acl injury",
+      "reason": "JSON parse error from AI",
+      "timestamp": "2026-03-09T16:13:34.860Z"
+    },
+    {
+      "id": "q-1773072840134",
+      "query": "i have acl injury suggest me a doctor",
+      "reason": "JSON parse error from AI",
+      "timestamp": "2026-03-09T16:14:00.134Z"
+    },
+    {
+      "id": "q-1773072968070",
+      "query": "i have knee pain suggest me appointments for today",
+      "reason": "JSON parse error from AI",
+      "timestamp": "2026-03-09T16:16:08.070Z"
+    },
+    {
+      "id": "q-1773073700695",
+      "query": "i have sevre asthma please give me doctors for consultatiioiions",
+      "reason": "No doctors specializing in asthma or respiratory conditions are listed in the provided data.",
+      "timestamp": "2026-03-09T16:28:20.695Z"
+    },
+    {
+      "id": "q-1773073737804",
+      "query": "i have knee injuty hely me consult a ddocter i wanna book",
+      "reason": "JSON parse error from AI",
+      "timestamp": "2026-03-09T16:28:57.805Z"
+    },
+    {
+      "id": "q-1773076895461",
+      "query": "i have knee injury",
+      "reason": "JSON parse error from AI",
+      "timestamp": "2026-03-09T17:21:35.461Z"
+    },
+    {
+      "id": "q-1773077055381",
+      "query": "i think my nerves are getting week. i need consultation for 14th march",
+      "reason": "JSON parse error from AI",
+      "timestamp": "2026-03-09T17:24:15.381Z"
+    },
+    {
+      "id": "q-1773077083609",
+      "query": "yes",
+      "reason": "JSON parse error from AI",
+      "timestamp": "2026-03-09T17:24:43.609Z"
+    },
+    {
+      "id": "q-1773077196209",
+      "query": "i need to reschedule my appointment with dr amit patel",
+      "reason": "Cannot access or modify patient appointment details for rescheduling.",
+      "timestamp": "2026-03-09T17:26:36.209Z"
+    },
+    {
+      "id": "q-1773082091444",
+      "query": "i want to cancel my appointment",
+      "reason": "Cannot cancel appointments directly; requires access to patient-specific booking data not available to the AI.",
+      "timestamp": "2026-03-09T18:48:11.444Z"
+    },
+    {
+      "id": "q-1773085678490",
+      "query": "i cant find a new book appointment button",
+      "reason": "User cannot find 'Book Appointment' button, indicating a need for direct human assistance or clarification on how to book an appointment outside of the chatbot's capabilities.",
+      "timestamp": "2026-03-09T19:47:58.490Z"
+    },
+    {
+      "id": "q-1773088289038",
+      "query": "Is Dr Mehta available Saturday for knee consultation and does ICICI Lombard cover it?",
+      "reason": "JSON parse error from AI",
+      "timestamp": "2026-03-09T20:31:29.038Z"
+    },
+    {
+      "id": "q-1773088304731",
+      "query": "Is Dr Mehta available Saturday for knee consultation and does ICICI Lombard cover it?",
+      "reason": "JSON parse error from AI",
+      "timestamp": "2026-03-09T20:31:44.731Z"
+    },
+    {
+      "id": "q-1773088461302",
+      "query": "which doctors are availaible this tuesday",
+      "reason": "JSON parse error from AI",
+      "timestamp": "2026-03-09T20:34:21.302Z"
+    },
+    {
+      "id": "q-1773121004069",
+      "query": "main chahta hun mujhe koi ek call back karo",
+      "reason": "User requested a callback which is beyond the capabilities of this AI assistant.",
+      "timestamp": "2026-03-10T05:36:44.069Z"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "users": [
+    {
+      "id": "admin-1",
+      "username": "admin",
+      "email": "indsihi1@gmail.com",
+      "password": "admin123",
+      "role": "admin",
+      "name": "Hospital Administrator"
+    }
+  ]
+}

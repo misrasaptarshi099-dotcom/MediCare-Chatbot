@@ -1,0 +1,50 @@
+{
+  "departments": [
+    {
+      "id": "dept-1",
+      "name": "Orthopedics",
+      "description": "Specializes in bone and joint care, sports injuries, and musculoskeletal conditions",
+      "location": "Building A, Floor 2",
+      "phone": "+1-555-0101"
+    },
+    {
+      "id": "dept-2",
+      "name": "Cardiology",
+      "description": "Heart and cardiovascular system diagnosis and treatment",
+      "location": "Building B, Floor 1",
+      "phone": "+1-555-0102"
+    },
+    {
+      "id": "dept-3",
+      "name": "Neurology",
+      "description": "Brain, spine, and nervous system disorders",
+      "location": "Building A, Floor 3",
+      "phone": "+1-555-0103"
+    },
+    {
+      "id": "dept-4",
+      "name": "Pediatrics",
+      "description": "Medical care for infants, children, and adolescents",
+      "location": "Building C, Floor 1",
+      "phone": "+1-555-0104"
+    },
+    {
+      "id": "dept-5",
+      "name": "Radiology",
+      "description": "Medical imaging including X-rays, MRI, CT scans",
+      "location": "Building A, Ground Floor",
+      "phone": "+1-555-0105"
+    }
+  ],
+  "visitingHours": {
+    "general": {
+      "weekdays": "10:00 AM - 12:00 PM, 4:00 PM - 8:00 PM",
+      "weekends": "10:00 AM - 8:00 PM"
+    },
+    "icu": {
+      "allowed": "5:00 PM - 5:30 PM, 8:00 PM - 8:30 PM",
+      "maxVisitors": 2,
+      "notes": "Only immediate family members allowed. Must wear protective gear."
+    }
+  }
+}

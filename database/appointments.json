@@ -1,0 +1,56 @@
+{
+  "appointments": [
+    {
+      "id": "apt-1773123134628",
+      "patientName": "Saptarshi Misra",
+      "patientPhone": "+91 7044321580",
+      "patientEmail": "misrasaptarshi099@gmail.com",
+      "doctorId": "doc-2",
+      "doctorName": "Dr. Priya Sharma",
+      "date": "2026-03-11",
+      "time": "09:00",
+      "service": "General Consultation",
+      "status": "cancelled",
+      "createdAt": "2026-03-10T06:12:14.628Z"
+    },
+    {
+      "id": "apt-1773123577184",
+      "patientName": "Indrajit Sihi",
+      "patientPhone": "+91 8695711596",
+      "patientEmail": "indrajit.sihi2025@vitstudent.ac.in",
+      "doctorId": "doc-2",
+      "doctorName": "Dr. Priya Sharma",
+      "date": "2026-03-26",
+      "time": "09:00",
+      "service": "General Consultation",
+      "status": "scheduled",
+      "createdAt": "2026-03-10T06:19:37.184Z"
+    },
+    {
+      "id": "apt-1773124976424",
+      "patientName": "Indrajit Sihi",
+      "patientPhone": "+91 7044321580",
+      "patientEmail": "indrajit.sihi2025@vitstudent.ac.in",
+      "doctorId": "doc-2",
+      "doctorName": "Dr. Priya Sharma",
+      "date": "2026-03-10",
+      "time": "16:00",
+      "service": "General Consultation",
+      "status": "cancelled",
+      "createdAt": "2026-03-10T06:42:56.424Z"
+    },
+    {
+      "id": "apt-1773125471218",
+      "patientName": "Saptarshi ",
+      "patientPhone": "+91 7044321589",
+      "patientEmail": "saptarshi.misra2025@vitstudent.ac.in",
+      "doctorId": "doc-2",
+      "doctorName": "Dr. Priya Sharma",
+      "date": "2026-03-11",
+      "time": "09:00",
+      "service": "General Consultation",
+      "status": "scheduled",
+      "createdAt": "2026-03-10T06:51:11.218Z"
+    }
+  ]
+}

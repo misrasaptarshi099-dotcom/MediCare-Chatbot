@@ -1,0 +1,102 @@
+﻿node : Error: 
+[GoogleGenerativeAI 
+Error]: Error fetching 
+from https://generative
+language.googleapis.com
+/v1beta/models/gemini-2
+.0-flash:generateConten
+t: [429 Too Many 
+Requests] You exceeded 
+your current quota, 
+please check your plan 
+and billing details. 
+For more information 
+on this error, head 
+to: https://ai.google.d
+ev/gemini-api/docs/rate
+-limits. To monitor 
+your current usage, 
+head to: https://ai.dev
+/rate-limit. 
+At line:1 char:1
++ node 
+--env-file=.env.local 
+test_gemini.mjs 2>&1 | 
+Out-File -Encoding  ...
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (Error: [Googl   
+ eG...ev/rate-limit    
+. :String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+* Quota exceeded for 
+metric: generativelangu
+age.googleapis.com/gene
+rate_content_free_tier_
+input_token_count, 
+limit: 0, model: 
+gemini-2.0-flash
+* Quota exceeded for 
+metric: generativelangu
+age.googleapis.com/gene
+rate_content_free_tier_
+requests, limit: 0, 
+model: gemini-2.0-flash
+* Quota exceeded for 
+metric: generativelangu
+age.googleapis.com/gene
+rate_content_free_tier_
+requests, limit: 0, 
+model: gemini-2.0-flash
+Please retry in 
+11.166224781s. [{"@type
+":"type.googleapis.com/
+google.rpc.Help","links
+":[{"description":"Lear
+n more about Gemini 
+API quotas","url":"http
+s://ai.google.dev/gemin
+i-api/docs/rate-limits"
+}]},{"@type":"type.goog
+leapis.com/google.rpc.Q
+uotaFailure","violation
+s":[{"quotaMetric":"gen
+erativelanguage.googlea
+pis.com/generate_conten
+t_free_tier_input_token
+_count","quotaId":"Gene
+rateContentInputTokensP
+erModelPerMinute-FreeTi
+er","quotaDimensions":{
+"location":"global","mo
+del":"gemini-2.0-flash"
+}},{"quotaMetric":"gene
+rativelanguage.googleap
+is.com/generate_content
+_free_tier_requests","q
+uotaId":"GenerateReques
+tsPerMinutePerProjectPe
+rModel-FreeTier","quota
+Dimensions":{"model":"g
+emini-2.0-flash","locat
+ion":"global"}},{"quota
+Metric":"generativelang
+uage.googleapis.com/gen
+erate_content_free_tier
+_requests","quotaId":"G
+enerateRequestsPerDayPe
+rProjectPerModel-FreeTi
+er","quotaDimensions":{
+"model":"gemini-2.0-fla
+sh","location":"global"
+}}]},{"@type":"type.goo
+gleapis.com/google.rpc.
+RetryInfo","retryDelay"
+:"11s"}]
