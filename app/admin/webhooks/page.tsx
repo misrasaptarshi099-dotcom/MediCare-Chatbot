@@ -36,7 +36,7 @@ interface Doctor {
 const fetcher = (url: string) => fetch(url).then(res => res.json())
 
 export default function WebhooksPage() {
-  const { data: doctorsData } = useSWR<{ doctors: Doctor[] }>('/api/doctors', fetcher)
+  const { data: doctors } = useSWR<Doctor[]>('/api/doctors', fetcher)
   const [logs, setLogs] = useState<WebhookLog[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   
@@ -49,13 +49,13 @@ export default function WebhooksPage() {
   const [webhookType, setWebhookType] = useState('doctor_schedule_update')
   const [customPayload, setCustomPayload] = useState('')
 
-  const doctors = doctorsData?.doctors || []
+  const doctorList = doctors || []
 
   const simulateDoctorUpdate = async () => {
     if (!selectedDoctor) return
     
     setIsSubmitting(true)
-    const doctor = doctors.find(d => d.id === selectedDoctor)
+    const doctor = doctorList.find(d => d.id === selectedDoctor)
     
     const payload = {
       doctorId: selectedDoctor,
@@ -162,7 +162,7 @@ export default function WebhooksPage() {
                     <SelectValue placeholder="Choose a doctor" />
                   </SelectTrigger>
                   <SelectContent>
-                    {doctors.map(doctor => (
+                    {doctorList.map(doctor => (
                       <SelectItem key={doctor.id} value={doctor.id}>
                         {doctor.name} - {doctor.specialty}
                       </SelectItem>
