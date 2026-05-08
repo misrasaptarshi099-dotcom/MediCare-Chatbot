@@ -101,8 +101,7 @@ function buildReminderHtml(apt: Appointment): string {
     <div style="padding:20px 32px;background:#eff6ff;border-top:1px solid #dbeafe;">
       <p style="color:#1e40af;font-size:13px;margin:0;text-align:center;">
         Need to cancel or reschedule? Log in to the 
-        <a href="http://localhost:3000/patient" style="color:#1d4ed8;font-weight:600;">Patient Portal</a>
-        or call <strong>+1-800-MEDICARE</strong>
+        <a href="https://medi-care-chatbot.vercel.app/patient/login" style="color:#1d4ed8;font-weight:600;">Patient Portal</a>
       </p>
     </div>
 
