@@ -4,6 +4,8 @@ import {
   getAllChatSessions,
   getCallbackTickets,
   getAppointments,
+  getWaitlist,
+  deleteWaitlistEntry,
   saveChatSession,
   type Appointment,
   type CallbackTicket,
@@ -15,7 +17,7 @@ import { db } from '@/lib/firestore'
 export async function GET() {
   try {
     const emails = new Set<string>()
-    const patientMap: Record<string, { email: string; name: string; appointmentCount: number; callbackCount: number; chatCount: number }> = {}
+    const patientMap: Record<string, { email: string; name: string; appointmentCount: number; callbackCount: number; chatCount: number; waitlistCount: number }> = {}
 
     // From appointments
     try {
@@ -24,7 +26,7 @@ export async function GET() {
         if (apt.patientEmail) {
           const e = apt.patientEmail.toLowerCase().trim()
           emails.add(e)
-          if (!patientMap[e]) patientMap[e] = { email: e, name: apt.patientName || e, appointmentCount: 0, callbackCount: 0, chatCount: 0 }
+          if (!patientMap[e]) patientMap[e] = { email: e, name: apt.patientName || e, appointmentCount: 0, callbackCount: 0, chatCount: 0, waitlistCount: 0 }
           patientMap[e].appointmentCount++
         }
       }
@@ -37,7 +39,7 @@ export async function GET() {
         if (cb.patientEmail) {
           const e = cb.patientEmail.toLowerCase().trim()
           emails.add(e)
-          if (!patientMap[e]) patientMap[e] = { email: e, name: cb.patientName || e, appointmentCount: 0, callbackCount: 0, chatCount: 0 }
+          if (!patientMap[e]) patientMap[e] = { email: e, name: cb.patientName || e, appointmentCount: 0, callbackCount: 0, chatCount: 0, waitlistCount: 0 }
           patientMap[e].callbackCount++
         }
       }
@@ -50,8 +52,21 @@ export async function GET() {
         if (s.email) {
           const e = s.email.toLowerCase().trim()
           emails.add(e)
-          if (!patientMap[e]) patientMap[e] = { email: e, name: e, appointmentCount: 0, callbackCount: 0, chatCount: 0 }
+          if (!patientMap[e]) patientMap[e] = { email: e, name: e, appointmentCount: 0, callbackCount: 0, chatCount: 0, waitlistCount: 0 }
           patientMap[e].chatCount = s.messages?.length || 0
+        }
+      }
+    } catch {}
+
+    // From waitlist
+    try {
+      const waitlist = await getWaitlist()
+      for (const entry of waitlist) {
+        if (entry.patientEmail) {
+          const e = entry.patientEmail.toLowerCase().trim()
+          emails.add(e)
+          if (!patientMap[e]) patientMap[e] = { email: e, name: entry.patientName || e, appointmentCount: 0, callbackCount: 0, chatCount: 0, waitlistCount: 0 }
+          patientMap[e].waitlistCount++
         }
       }
     } catch {}
@@ -63,7 +78,7 @@ export async function GET() {
   }
 }
 
-// DELETE — remove a patient's appointments, chats, and/or callback tickets
+// DELETE — remove a patient's appointments, waitlist, chats, and/or callback tickets
 export async function DELETE(request: Request) {
   const { email, deleteAppointments, deleteChats, deleteCallbacks } = await request.json()
 
@@ -85,6 +100,22 @@ export async function DELETE(request: Request) {
       results.push(`Removed ${toDelete.length} appointment(s)`)
     } catch {
       results.push('No appointments found')
+    }
+  }
+
+  // Always delete waitlist entries when deleting appointments (orphaned waitlist entries are useless)
+  if (deleteAppointments) {
+    try {
+      const waitlist = await getWaitlist()
+      const toDelete = waitlist.filter(e => e.patientEmail?.toLowerCase().trim() === normalizedEmail)
+      for (const entry of toDelete) {
+        await deleteWaitlistEntry(entry.id)
+      }
+      if (toDelete.length > 0) {
+        results.push(`Removed ${toDelete.length} waitlist entry/entries`)
+      }
+    } catch {
+      results.push('No waitlist entries found')
     }
   }
 
@@ -114,3 +145,4 @@ export async function DELETE(request: Request) {
 
   return NextResponse.json({ success: true, results })
 }
+

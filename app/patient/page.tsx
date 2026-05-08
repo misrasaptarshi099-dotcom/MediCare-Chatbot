@@ -209,7 +209,13 @@ export default function PatientDashboard() {
     chats: [],
     waitlist: [],
   })
-  const [activeTab, setActiveTab] = useState<'chat' | 'appointments' | 'callbacks'>('chat')
+  const [activeTab, setActiveTabRaw] = useState<'chat' | 'appointments' | 'callbacks'>('chat')
+
+  // Refresh patient data whenever the user switches tabs
+  const setActiveTab = (tab: 'chat' | 'appointments' | 'callbacks') => {
+    setActiveTabRaw(tab)
+    if (userEmail) fetchPatientData(userEmail)
+  }
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -362,21 +368,20 @@ export default function PatientDashboard() {
 
             {/* ── Tab Content ─────────────────────────────────────────────── */}
             <div className="flex-1 relative overflow-hidden">
-              <AnimatePresence mode="wait">
 
-                {/* Chat */}
-                {activeTab === 'chat' && (
-                  <motion.div
-                    key="chat"
-                    initial={{ opacity: 0, y: 14, scale: 0.98, filter: 'blur(4px)' }}
-                    animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
-                    exit={{ opacity: 0, y: -14, scale: 0.98, filter: 'blur(4px)' }}
-                    transition={SPRING}
-                    className="absolute inset-0 border border-border/60 rounded-2xl overflow-hidden bg-card/50 backdrop-blur-sm shadow-sm"
-                  >
-                    <ChatInterface initialEmail={userEmail} initialMessages={patientData.chats} />
-                  </motion.div>
-                )}
+              {/* Chat — ALWAYS MOUNTED to preserve state; hidden via CSS when not active */}
+              <div
+                className="absolute inset-0 border border-border/60 rounded-2xl overflow-hidden bg-card/50 backdrop-blur-sm shadow-sm transition-opacity duration-200"
+                style={{
+                  opacity: activeTab === 'chat' ? 1 : 0,
+                  pointerEvents: activeTab === 'chat' ? 'auto' : 'none',
+                  zIndex: activeTab === 'chat' ? 10 : 0,
+                }}
+              >
+                <ChatInterface initialEmail={userEmail} initialMessages={patientData.chats} />
+              </div>
+
+              <AnimatePresence mode="wait">
 
                 {/* Appointments */}
                 {activeTab === 'appointments' && (
