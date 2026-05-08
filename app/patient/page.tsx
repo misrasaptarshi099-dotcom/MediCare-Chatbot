@@ -5,7 +5,7 @@ import { motion, AnimatePresence, useMotionValue, useSpring } from 'framer-motio
 import { useRouter } from 'next/navigation'
 import {
   Stethoscope, LogOut, Calendar, MessageSquare, PhoneCall, ListOrdered,
-  Sparkles, User, Activity
+  Sparkles, User, Activity, FileText, Download
 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -177,6 +177,50 @@ function CallbackCard({ cb, index }: { cb: any; index: number }) {
   )
 }
 
+// ── Report card ─────────────────────────────────────────────────────────────
+function ReportCard({ report, index }: { report: any; index: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ ...SPRING, delay: index * 0.07 }}
+      whileHover={{ y: -2, boxShadow: '0 8px 30px rgba(0,0,0,0.08)' }}
+      className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-border/60 rounded-xl bg-card/70 gap-4 cursor-default"
+    >
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-foreground flex items-center gap-2">
+          {report.testName}
+          <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
+            {report.reportType === 'blood_test' ? 'Blood Test' : 'Imaging'}
+          </Badge>
+        </p>
+        <p className="text-sm text-muted-foreground mt-1">
+          {new Date(report.createdAt).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+        </p>
+        {report.notes && (
+          <p className="text-xs text-muted-foreground/80 mt-2 bg-muted/50 p-2 rounded-md border border-border/40 inline-block">
+            <span className="font-medium text-foreground/80">Notes:</span> {report.notes}
+          </p>
+        )}
+      </div>
+      <div className="flex flex-col items-end gap-2 shrink-0">
+        <Badge className={`w-fit ${
+          report.status === 'sent' || report.status === 'ready'
+            ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 border border-green-200 dark:border-green-800'
+            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800'
+        }`}>
+          {report.status === 'sent' || report.status === 'ready' ? '✓ Ready' : '⏳ Processing'}
+        </Badge>
+        <Button size="sm" variant="outline" className="gap-2" asChild>
+          <a href={report.fileUrl} target="_blank" rel="noopener noreferrer">
+            <Download className="h-3.5 w-3.5" /> Download PDF
+          </a>
+        </Button>
+      </div>
+    </motion.div>
+  )
+}
+
 // ── Empty state ───────────────────────────────────────────────────────────────
 function EmptyState({ label }: { label: string }) {
   return (
@@ -203,16 +247,17 @@ export default function PatientDashboard() {
   const router = useRouter()
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [patientData, setPatientData] = useState<{ appointments: any[]; callbacks: any[]; chats: any[]; waitlist: any[] }>({
+  const [patientData, setPatientData] = useState<{ appointments: any[]; callbacks: any[]; chats: any[]; waitlist: any[]; reports: any[] }>({
     appointments: [],
     callbacks: [],
     chats: [],
     waitlist: [],
+    reports: [],
   })
-  const [activeTab, setActiveTabRaw] = useState<'chat' | 'appointments' | 'callbacks'>('chat')
+  const [activeTab, setActiveTabRaw] = useState<'chat' | 'appointments' | 'callbacks' | 'reports'>('chat')
 
   // Refresh patient data whenever the user switches tabs
-  const setActiveTab = (tab: 'chat' | 'appointments' | 'callbacks') => {
+  const setActiveTab = (tab: 'chat' | 'appointments' | 'callbacks' | 'reports') => {
     setActiveTabRaw(tab)
     if (userEmail) fetchPatientData(userEmail)
   }
@@ -260,6 +305,7 @@ export default function PatientDashboard() {
   const TABS = [
     { key: 'chat',         label: 'AI Assistant',  icon: MessageSquare },
     { key: 'appointments', label: 'Appointments',  icon: Calendar },
+    { key: 'reports',      label: 'Lab Reports',   icon: FileText },
     { key: 'callbacks',    label: 'Callbacks',     icon: PhoneCall },
   ] as const
 
@@ -481,6 +527,35 @@ export default function PatientDashboard() {
                       ) : (
                         patientData.callbacks.map((cb, i) => (
                           <CallbackCard key={cb.id} cb={cb} index={i} />
+                        ))
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Reports */}
+                {activeTab === 'reports' && (
+                  <motion.div
+                    key="reports"
+                    initial={{ opacity: 0, y: 14, scale: 0.98, filter: 'blur(4px)' }}
+                    animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+                    exit={{ opacity: 0, y: -14, scale: 0.98, filter: 'blur(4px)' }}
+                    transition={SPRING}
+                    className="absolute inset-0 overflow-auto pb-4 pr-0.5"
+                  >
+                    <div className="flex items-center gap-2 mb-3">
+                      <FileText className="h-4 w-4 text-primary" />
+                      <h2 className="font-semibold text-foreground">My Lab Reports</h2>
+                      <span className="text-xs text-muted-foreground ml-auto">
+                        {patientData.reports.length} records
+                      </span>
+                    </div>
+                    <div className="space-y-3 rounded-2xl border border-border/60 bg-card/50 backdrop-blur-sm p-4">
+                      {patientData.reports.length === 0 ? (
+                        <EmptyState label="No reports available yet." />
+                      ) : (
+                        patientData.reports.map((report, i) => (
+                          <ReportCard key={report.id} report={report} index={i} />
                         ))
                       )}
                     </div>

@@ -182,6 +182,7 @@ export function ChatInterface({
   const rafRef = useRef<number | null>(null)
   // TTS pulse interval ref
   const ttsPulseRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const recognitionRef = useRef<any>(null)
 
   // ── Web Audio mic analysis for STT aurora sync ───────────────────────────
   const startAudioAnalysis = async () => {
@@ -359,12 +360,22 @@ export function ChatInterface({
 
   // ── Voice input ─────────────────────────────────────────────────────────────
   const handleVoiceInput = () => {
+    if (isListening) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop()
+      }
+      setIsListening(false)
+      stopAudioAnalysis()
+      return
+    }
+
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
       alert('Speech recognition is not supported in your browser.')
       return
     }
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     const recognition = new SpeechRecognition()
+    recognitionRef.current = recognition
     recognition.continuous = false
     recognition.interimResults = false
     recognition.lang = 'en-US'

@@ -19,7 +19,8 @@ import {
   Webhook,
   UserX,
   Bell,
-  ListOrdered
+  ListOrdered,
+  FileText
 } from 'lucide-react'
 
 interface User {
@@ -38,6 +39,7 @@ const navItems = [
   { href: '/admin/reminders', icon: Bell, label: 'Reminders' },
   { href: '/admin/insurance', icon: Shield, label: 'Insurance' },
   { href: '/admin/departments', icon: Building2, label: 'Departments' },
+  { href: '/admin/reports', icon: FileText, label: 'Lab Reports' },
   { href: '/admin/queries', icon: MessageSquare, label: 'Unanswered Queries' },
   { href: '/admin/callbacks', icon: Phone, label: 'Callback Tickets' },
   { href: '/admin/webhooks', icon: Webhook, label: 'Webhooks' },

@@ -12,6 +12,7 @@ if (!admin.apps.length) {
         clientEmail,
         privateKey,
       }),
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
     })
   } else {
     // Initialize without credentials for build-time (pages will fail at runtime if called)

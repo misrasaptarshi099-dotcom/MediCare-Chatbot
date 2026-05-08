@@ -5,9 +5,11 @@ import {
   getCallbackTickets,
   getChatSession,
   getWaitlist,
+  getPatientReports,
   type Appointment,
   type CallbackTicket,
   type WaitlistEntry,
+  type LabReport,
 } from '@/lib/db'
 
 export async function GET(request: Request) {
@@ -62,11 +64,20 @@ export async function GET(request: Request) {
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     } catch {}
 
+    // Reports
+    let userReports: LabReport[] = []
+    try {
+      userReports = await getPatientReports(normalizedEmail)
+    } catch (e) {
+      console.error('Error fetching patient reports:', e)
+    }
+
     return NextResponse.json({
       appointments: userAppointments,
       callbacks: userCallbacks,
       chats: userChats,
       waitlist: userWaitlist,
+      reports: userReports,
     })
   } catch (error) {
     console.error('Error fetching patient data:', error)

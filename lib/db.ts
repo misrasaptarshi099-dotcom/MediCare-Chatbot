@@ -135,6 +135,21 @@ export interface OtpEntry {
   purpose?: string
 }
 
+export interface LabReport {
+  id: string
+  patientName: string
+  patientEmail: string
+  patientPhone: string
+  reportType: 'blood_test' | 'xray'
+  testName: string
+  fileUrl: string
+  fileName: string
+  notes?: string
+  status: 'pending' | 'ready' | 'sent'
+  createdAt: string
+  sentAt?: string
+}
+
 // ── Doctors ───────────────────────────────────────────────────────────────────
 
 export async function getDoctors(): Promise<Doctor[]> {
