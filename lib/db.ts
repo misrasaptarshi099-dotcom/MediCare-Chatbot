@@ -426,3 +426,32 @@ ${insLines}
 ${svcLines}
 `.trim()
 }
+
+// ── Lab Reports ───────────────────────────────────────────────────────────────
+
+export async function getLabReports(): Promise<LabReport[]> {
+  const snap = await db.collection('labReports').get()
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() } as LabReport))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+}
+
+export async function getPatientReports(email: string): Promise<LabReport[]> {
+  const normalizedEmail = email.toLowerCase().trim()
+  const snap = await db.collection('labReports').where('patientEmail', '==', normalizedEmail).get()
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() } as LabReport))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+}
+
+export async function addLabReport(report: LabReport): Promise<void> {
+  await db.collection('labReports').doc(report.id).set(report)
+}
+
+export async function updateLabReport(id: string, updates: Partial<LabReport>): Promise<void> {
+  await db.collection('labReports').doc(id).update(updates)
+}
+
+export async function deleteLabReport(id: string): Promise<void> {
+  await db.collection('labReports').doc(id).delete()
+}
