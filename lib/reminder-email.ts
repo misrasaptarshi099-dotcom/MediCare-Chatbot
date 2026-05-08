@@ -12,11 +12,17 @@ function buildReminderHtml(apt: Appointment): string {
     ? '<li>You may eat and drink normally before this consultation.</li>'
     : '<li><strong>Fasting required:</strong> Do not eat or drink anything (except water) for at least 8 hours before your appointment.</li>'
 
+  // Unique timestamp prevents Gmail from collapsing duplicate reminders in a thread
+  const sentAt = new Date().toISOString()
+  const spacer = '&zwnj;&nbsp;'.repeat(30)
+
   return `
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8" /></head>
 <body style="margin:0;padding:0;background:#f0f4f8;font-family:'Segoe UI',Arial,sans-serif;">
+  <!-- Gmail anti-clip: unique hidden preheader so Gmail never collapses this email -->
+  <div style="display:none!important;font-size:1px;color:#f0f4f8;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">Reminder sent ${sentAt} for ${apt.patientName} with ${apt.doctorName} on ${apt.date} at ${apt.time} ${spacer}</div>
   <div style="max-width:560px;margin:32px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
     <!-- Header -->
     <div style="background:linear-gradient(135deg,#1e40af,#3b82f6);padding:32px 32px 24px;text-align:center;">
