@@ -13,6 +13,13 @@ export interface Doctor {
   availability: Record<string, string[]>
 }
 
+function normalizeAvailability(availability: Record<string, string[]>) {
+  return Object.entries(availability).reduce<Record<string, string[]>>((acc, [day, slots]) => {
+    acc[day.toLowerCase()] = slots
+    return acc
+  }, {})
+}
+
 export interface Department {
   id: string
   name: string
@@ -60,12 +67,15 @@ export interface Appointment {
   patientName: string
   patientPhone: string
   patientEmail: string
+  patientUid?: string
   doctorId: string
   doctorName: string
   date: string
   time: string
   service: string
   status: 'scheduled' | 'completed' | 'cancelled'
+  paymentStatus?: 'paid' | 'unpaid' | 'refunded'
+  amount?: number
   createdAt: string
 }
 
@@ -81,6 +91,7 @@ export interface CallbackTicket {
   patientName: string
   patientPhone: string
   patientEmail: string
+  patientUid?: string
   querySummary: string
   department: string
   status: 'pending' | 'resolved' | 'in-progress'
@@ -105,7 +116,7 @@ export interface ChatMessage {
 }
 
 export interface ChatSession {
-  email: string
+  uid: string
   messages: ChatMessage[]
   lastUpdated: string
 }
@@ -119,6 +130,7 @@ export interface WaitlistEntry {
   patientName: string
   patientEmail: string
   patientPhone: string
+  patientUid?: string
   service: string
   createdAt: string
 }
@@ -129,7 +141,7 @@ export interface SentReminder {
 }
 
 export interface OtpEntry {
-  email: string
+  identifier: string
   code: string
   expiresAt: number
   purpose?: string
@@ -140,26 +152,50 @@ export interface LabReport {
   patientName: string
   patientEmail: string
   patientPhone: string
+  patientUid?: string
   reportType: 'blood_test' | 'xray'
   testName: string
   fileUrl: string
+  storagePath?: string
   fileName: string
   notes?: string
   status: 'pending' | 'ready' | 'sent'
+  appointmentId?: string
   createdAt: string
   sentAt?: string
+}
+
+export interface Patient {
+  uid: string
+  name: string
+  email?: string
+  phone?: string
+  authProviders: ('email' | 'phone' | 'google')[]
+  createdAt: string
+  updatedAt: string
 }
 
 // ── Doctors ───────────────────────────────────────────────────────────────────
 
 export async function getDoctors(): Promise<Doctor[]> {
   const snap = await db.collection('doctors').get()
-  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Doctor))
+  return snap.docs.map(d => {
+    const doctor = { id: d.id, ...d.data() } as Doctor
+    return {
+      ...doctor,
+      availability: normalizeAvailability(doctor.availability ?? {}),
+    }
+  })
 }
 
 export async function getDoctor(id: string): Promise<Doctor | null> {
   const doc = await db.collection('doctors').doc(id).get()
-  return doc.exists ? ({ id: doc.id, ...doc.data() } as Doctor) : null
+  if (!doc.exists) return null
+  const doctor = { id: doc.id, ...doc.data() } as Doctor
+  return {
+    ...doctor,
+    availability: normalizeAvailability(doctor.availability ?? {}),
+  }
 }
 
 export async function addDoctor(doctor: Doctor): Promise<void> {
@@ -266,32 +302,39 @@ export async function getAdminUser(id: string): Promise<User | null> {
 
 // ── OTPs ──────────────────────────────────────────────────────────────────────
 
-export async function saveOtp(email: string, code: string, expiresAt: number, purpose: string = 'patient'): Promise<void> {
-  const docId = `${email.toLowerCase()}_${purpose}`
-  await db.collection('otps').doc(docId).set({ email: email.toLowerCase(), code, expiresAt, purpose })
+export async function saveOtp(identifier: string, code: string, expiresAt: number, purpose: string = 'patient'): Promise<void> {
+  const docId = `${identifier.toLowerCase()}_${purpose}`
+  await db.collection('otps').doc(docId).set({ identifier: identifier.toLowerCase(), code, expiresAt, purpose })
 }
 
-export async function getOtp(email: string, purpose: string = 'patient'): Promise<OtpEntry | null> {
-  const docId = `${email.toLowerCase()}_${purpose}`
+export async function getOtp(identifier: string, purpose: string = 'patient'): Promise<OtpEntry | null> {
+  const docId = `${identifier.toLowerCase()}_${purpose}`
   const doc = await db.collection('otps').doc(docId).get()
   return doc.exists ? (doc.data() as OtpEntry) : null
 }
 
-export async function deleteOtp(email: string, purpose: string = 'patient'): Promise<void> {
-  const docId = `${email.toLowerCase()}_${purpose}`
+export async function deleteOtp(identifier: string, purpose: string = 'patient'): Promise<void> {
+  const docId = `${identifier.toLowerCase()}_${purpose}`
   await db.collection('otps').doc(docId).delete()
 }
 
 // ── Chat Sessions ─────────────────────────────────────────────────────────────
 
-export async function getChatSession(email: string): Promise<ChatSession | null> {
-  const doc = await db.collection('chatSessions').doc(email.toLowerCase()).get()
-  return doc.exists ? (doc.data() as ChatSession) : null
+export async function getChatSession(uid: string): Promise<ChatSession | null> {
+  const doc = await db.collection('chatSessions').doc(uid).get()
+  if (!doc.exists) return null
+
+  const data = doc.data() as ChatSession
+  const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000
+  const cutoff = Date.now() - THREE_MONTHS_MS
+  data.messages = data.messages.filter(m => m.timestamp >= cutoff)
+  
+  return data
 }
 
-export async function saveChatSession(email: string, messages: ChatMessage[], lastUpdated: string): Promise<void> {
-  await db.collection('chatSessions').doc(email.toLowerCase()).set({
-    email: email.toLowerCase(),
+export async function saveChatSession(uid: string, messages: ChatMessage[], lastUpdated: string): Promise<void> {
+  await db.collection('chatSessions').doc(uid).set({
+    uid,
     messages,
     lastUpdated,
   })
@@ -299,7 +342,14 @@ export async function saveChatSession(email: string, messages: ChatMessage[], la
 
 export async function getAllChatSessions(): Promise<ChatSession[]> {
   const snap = await db.collection('chatSessions').get()
-  return snap.docs.map(d => d.data() as ChatSession)
+  const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000
+  const cutoff = Date.now() - THREE_MONTHS_MS
+  
+  return snap.docs.map(d => {
+    const data = d.data() as ChatSession
+    data.messages = data.messages.filter(m => m.timestamp >= cutoff)
+    return data
+  })
 }
 
 // ── Waitlist ──────────────────────────────────────────────────────────────────
@@ -388,7 +438,7 @@ export async function buildHospitalContext(): Promise<string> {
       .filter(([, slots]) => slots.length > 0)
       .map(([day, slots]) => `${day}: ${slots.join(', ')}`)
       .join(' | ')
-    return `- ${d.name} | ${d.specialty} | ${d.department} | Room ${d.roomNumber} | Fee $${d.consultationFee} | Today (${dayName}) slots: [${todaySlots.join(', ') || 'none'}] | Full week: ${weekSummary}`
+    return `- ${d.name} | ${d.specialty} | ${d.department} | Room ${d.roomNumber} | Fee ₹${d.consultationFee} | Today (${dayName}) slots: [${todaySlots.join(', ') || 'none'}] | Full week: ${weekSummary}`
   }).join('\n')
 
   const deptLines = departments.map(d =>
@@ -404,7 +454,7 @@ export async function buildHospitalContext(): Promise<string> {
   ).join('\n')
 
   const svcLines = services.map(s =>
-    `- ${s.name} (id: ${s.id}) | ${s.department} | Duration: ${s.duration} min | Base price: $${s.basePrice}`
+    `- ${s.name} (id: ${s.id}) | ${s.department} | Duration: ${s.duration} min | Base price: ₹${s.basePrice}`
   ).join('\n')
 
   return `
@@ -436,6 +486,11 @@ export async function getLabReports(): Promise<LabReport[]> {
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 }
 
+export async function getLabReport(id: string): Promise<LabReport | null> {
+  const doc = await db.collection('labReports').doc(id).get()
+  return doc.exists ? ({ id: doc.id, ...doc.data() } as LabReport) : null
+}
+
 export async function getPatientReports(email: string): Promise<LabReport[]> {
   const normalizedEmail = email.toLowerCase().trim()
   const snap = await db.collection('labReports').where('patientEmail', '==', normalizedEmail).get()
@@ -454,4 +509,108 @@ export async function updateLabReport(id: string, updates: Partial<LabReport>): 
 
 export async function deleteLabReport(id: string): Promise<void> {
   await db.collection('labReports').doc(id).delete()
+}
+
+// ── Patients ──────────────────────────────────────────────────────────────────
+
+export async function getPatientByUid(uid: string): Promise<Patient | null> {
+  const doc = await db.collection('patients').doc(uid).get()
+  if (!doc.exists) return null
+  return doc.data() as Patient
+}
+
+export async function getAllPatients(): Promise<Patient[]> {
+  const snap = await db.collection('patients').get()
+  return snap.docs.map(d => d.data() as Patient)
+}
+
+export async function getPatientByIdentifier(identifier: string): Promise<Patient | null> {
+  const normalized = identifier.toLowerCase().trim()
+
+  // Try email first
+  const emailSnap = await db.collection('patients').where('email', '==', normalized).limit(1).get()
+  if (!emailSnap.empty) {
+    return emailSnap.docs[0].data() as Patient
+  }
+
+  // Try phone number
+  const phoneSnap = await db.collection('patients').where('phone', '==', normalized).limit(1).get()
+  if (!phoneSnap.empty) {
+    return phoneSnap.docs[0].data() as Patient
+  }
+
+  return null
+}
+
+export async function createOrUpdatePatient(data: Partial<Patient> & { uid: string }): Promise<Patient> {
+  const existing = await getPatientByUid(data.uid)
+  const now = new Date().toISOString()
+
+  if (existing) {
+    // Merge: add new auth providers, update contact info if provided
+    const updatedProviders = Array.from(new Set([
+      ...existing.authProviders,
+      ...(data.authProviders || []),
+    ]))
+    const updates: Partial<Patient> = {
+      authProviders: updatedProviders as Patient['authProviders'],
+      updatedAt: now,
+    }
+    if (data.name && !existing.name) updates.name = data.name
+    if (data.email && !existing.email) updates.email = data.email
+    if (data.phone && !existing.phone) updates.phone = data.phone
+
+    await db.collection('patients').doc(data.uid).update(updates)
+    return { ...existing, ...updates }
+  }
+
+  // Create new patient
+  const patient: any = {
+    uid: data.uid,
+    name: data.name || '',
+    authProviders: data.authProviders || [],
+    createdAt: now,
+    updatedAt: now,
+  }
+  if (data.email) patient.email = data.email
+  if (data.phone) patient.phone = data.phone
+  await db.collection('patients').doc(data.uid).set(patient)
+  return patient
+}
+
+export async function linkAuthProvider(
+  uid: string,
+  provider: 'email' | 'phone' | 'google',
+  value: string
+): Promise<Patient | null> {
+  const patient = await getPatientByUid(uid)
+  if (!patient) return null
+
+  const updates: Record<string, any> = {
+    updatedAt: new Date().toISOString(),
+  }
+
+  // Add the provider to the list
+  if (!patient.authProviders.includes(provider)) {
+    updates.authProviders = [...patient.authProviders, provider]
+  }
+
+  // Set the contact info
+  if (provider === 'email') {
+    updates.email = value.toLowerCase().trim()
+  } else if (provider === 'phone') {
+    updates.phone = value.trim()
+  }
+
+  await db.collection('patients').doc(uid).update(updates)
+  return { ...patient, ...updates } as Patient
+}
+
+// ── Lab Reports by UID ────────────────────────────────────────────────────────
+
+export async function getPatientReportsByUid(uid: string): Promise<LabReport[]> {
+  const snap = await db.collection('labReports').where('patientUid', '==', uid).get()
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() } as LabReport))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 }

@@ -43,9 +43,15 @@ export default function InsurancePage() {
   }, [])
 
   const fetchInsurers = async () => {
-    const res = await fetch('/api/insurance')
-    const data = await res.json()
-    setInsurers(data)
+    try {
+      const res = await fetch('/api/insurance')
+      const data = await res.json()
+      // The API returns { insurancePartners: [...] }
+      setInsurers(data.insurancePartners || [])
+    } catch (error) {
+      console.error('Failed to fetch insurers:', error)
+      setInsurers([])
+    }
   }
 
   const handleAdd = async () => {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Fragment } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -199,7 +199,7 @@ export default function DoctorsPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Consultation Fee ($)</Label>
+                  <Label>Consultation Fee (₹)</Label>
                   <Input
                     type="number"
                     value={formData.consultationFee}
@@ -242,7 +242,7 @@ export default function DoctorsPage() {
                   <TableCell>
                     <Badge variant="secondary">{doctor.department}</Badge>
                   </TableCell>
-                  <TableCell>${doctor.consultationFee}</TableCell>
+                  <TableCell>₹{doctor.consultationFee}</TableCell>
                   <TableCell>{doctor.roomNumber}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
@@ -303,7 +303,7 @@ export default function DoctorsPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Consultation Fee ($)</Label>
+                <Label>Consultation Fee (₹)</Label>
                 <Input
                   type="number"
                   value={formData.consultationFee}
@@ -339,7 +339,7 @@ export default function DoctorsPage() {
                 <div key={day} className="font-medium text-sm text-center capitalize">{day.slice(0, 3)}</div>
               ))}
               {TIME_SLOTS.map(slot => (
-                <>
+                <Fragment key={slot}>
                   <div key={`label-${slot}`} className="text-sm text-muted-foreground py-1">{slot}</div>
                   {DAYS.map(day => {
                     const isAvailable = selectedDoctor?.availability[day]?.includes(slot)
@@ -357,7 +357,7 @@ export default function DoctorsPage() {
                       </button>
                     )
                   })}
-                </>
+                </Fragment>
               ))}
             </div>
           </div>

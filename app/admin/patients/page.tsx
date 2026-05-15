@@ -7,11 +7,15 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { 
   UserX, Search, Trash2, MessageSquare, Calendar, PhoneCall, 
-  Loader2, AlertTriangle, CheckCircle2, Users
+  Loader2, AlertTriangle, CheckCircle2, Users, Plus
 } from 'lucide-react'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
 
 type Patient = {
+  uid: string
   email: string
+  phone: string
   name: string
   appointmentCount: number
   callbackCount: number
@@ -38,13 +42,26 @@ export default function AdminPatientsPage() {
   })
   const [resultMessage, setResultMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
+  // Add Patient State
+  const [isAddOpen, setIsAddOpen] = useState(false)
+  const [addName, setAddName] = useState('')
+  const [addContactType, setAddContactType] = useState<'email' | 'phone'>('phone')
+  const [addContactValue, setAddContactValue] = useState('')
+  const [isAdding, setIsAdding] = useState(false)
+  const [addError, setAddError] = useState('')
+
   useEffect(() => {
     fetchPatients()
   }, [])
 
   useEffect(() => {
     const q = search.toLowerCase()
-    setFiltered(patients.filter(p => p.email.includes(q) || p.name.toLowerCase().includes(q)))
+    setFiltered(patients.filter(p => 
+      (p.email && p.email.includes(q)) || 
+      (p.name && p.name.toLowerCase().includes(q)) ||
+      (p.phone && p.phone.includes(q)) ||
+      p.uid.toLowerCase().includes(q)
+    ))
   }, [search, patients])
 
   const fetchPatients = async () => {
@@ -68,17 +85,17 @@ export default function AdminPatientsPage() {
       return
     }
 
-    setDeleting(confirmTarget.email)
+    setDeleting(confirmTarget.uid)
     setResultMessage(null)
     try {
       const res = await fetch('/api/admin/patients', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: confirmTarget.email, ...deleteOptions }),
+        body: JSON.stringify({ uid: confirmTarget.uid, ...deleteOptions }),
       })
       const data = await res.json()
       if (res.ok) {
-        setResultMessage({ type: 'success', text: `✓ Deleted data for ${confirmTarget.email}: ${data.results.join(', ')}` })
+        setResultMessage({ type: 'success', text: `✓ Deleted data for ${confirmTarget.name}: ${data.results.join(', ')}` })
         await fetchPatients()
       } else {
         setResultMessage({ type: 'error', text: data.error || 'Delete failed.' })
@@ -91,6 +108,39 @@ export default function AdminPatientsPage() {
     }
   }
 
+  const handleAddPatient = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setAddError('')
+    setIsAdding(true)
+
+    try {
+      const res = await fetch('/api/admin/patients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          name: addName, 
+          contactType: addContactType, 
+          contactValue: addContactValue 
+        })
+      })
+
+      const data = await res.json()
+      if (res.ok) {
+        setResultMessage({ type: 'success', text: `✓ Successfully added patient: ${addName}` })
+        setIsAddOpen(false)
+        setAddName('')
+        setAddContactValue('')
+        await fetchPatients()
+      } else {
+        setAddError(data.error || 'Failed to add patient.')
+      }
+    } catch {
+      setAddError('Network error. Please try again.')
+    } finally {
+      setIsAdding(false)
+    }
+  }
+
   const toggleOption = (key: keyof DeleteOptions) => {
     setDeleteOptions(prev => ({ ...prev, [key]: !prev[key] }))
   }
@@ -99,64 +149,139 @@ export default function AdminPatientsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+          <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
             <Users className="h-6 w-6 text-primary" />
             Patient Management
-          </h1>
+          </h2>
           <p className="text-muted-foreground mt-1">View and delete patient data records</p>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchPatients} disabled={loading}>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="gap-2">
+                <Plus className="h-4 w-4" />
+                Add Patient
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Patient</DialogTitle>
+                <DialogDescription>
+                  Create a new patient record. They will be able to log in using OTP with the contact method you provide.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleAddPatient} className="space-y-4 pt-4">
+                {addError && <div className="p-3 text-sm text-red-500 bg-red-50 dark:bg-red-900/20 rounded-md border border-red-200 dark:border-red-800">{addError}</div>}
+                
+                <div className="space-y-2">
+                  <Label>Full Name</Label>
+                  <Input 
+                    placeholder="E.g. John Doe" 
+                    value={addName} 
+                    onChange={e => setAddName(e.target.value)} 
+                    required 
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Contact Method</Label>
+                  <div className="flex gap-2">
+                    <Button 
+                      type="button"
+                      variant={addContactType === 'phone' ? 'default' : 'outline'} 
+                      onClick={() => setAddContactType('phone')}
+                      className="flex-1"
+                    >
+                      Phone Number
+                    </Button>
+                    <Button 
+                      type="button"
+                      variant={addContactType === 'email' ? 'default' : 'outline'} 
+                      onClick={() => setAddContactType('email')}
+                      className="flex-1"
+                    >
+                      Email Address
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{addContactType === 'phone' ? 'Phone Number' : 'Email Address'}</Label>
+                  <Input 
+                    type={addContactType === 'email' ? 'email' : 'tel'}
+                    placeholder={addContactType === 'phone' ? '+91 9876543210' : 'john@example.com'} 
+                    value={addContactValue} 
+                    onChange={e => setAddContactValue(e.target.value)} 
+                    required 
+                  />
+                  {addContactType === 'phone' && <p className="text-xs text-muted-foreground">Include country code (e.g., +91)</p>}
+                </div>
+
+                <Button type="submit" className="w-full" disabled={isAdding}>
+                  {isAdding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  {isAdding ? 'Adding Patient...' : 'Add Patient'}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          <Button variant="outline" size="sm" onClick={fetchPatients} disabled={loading}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
+          </Button>
+        </div>
       </div>
 
-      {/* Result Message */}
-      {resultMessage && (
-        <div className={`flex items-start gap-2 p-4 rounded-lg border text-sm font-medium ${
-          resultMessage.type === 'success'
-            ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800'
-            : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800'
-        }`}>
-          {resultMessage.type === 'success'
-            ? <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
-            : <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-          }
-          {resultMessage.text}
-          <button onClick={() => setResultMessage(null)} className="ml-auto opacity-60 hover:opacity-100">✕</button>
-        </div>
-      )}
-
-      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by email or name..."
-          className="pl-9"
+          placeholder="Search by ID, email, phone, or name..."
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9 max-w-md bg-card"
         />
       </div>
 
-      {/* Patient List */}
+      {resultMessage && (
+        <div className={`p-4 rounded-xl flex items-start gap-3 border ${
+          resultMessage.type === 'success' 
+            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400' 
+            : 'bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400'
+        }`}>
+          {resultMessage.type === 'success' ? <CheckCircle2 className="h-5 w-5 shrink-0" /> : <AlertTriangle className="h-5 w-5 shrink-0" />}
+          <div className="font-medium text-sm pt-0.5">{resultMessage.text}</div>
+        </div>
+      )}
+
       {loading ? (
-        <div className="flex items-center justify-center py-16">
+        <div className="flex justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : filtered.length === 0 ? (
-        <Card>
-          <CardContent className="py-16 text-center text-muted-foreground">
-            {search ? `No patients found matching "${search}"` : 'No patient records found.'}
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+            <UserX className="h-12 w-12 mb-4 opacity-20" />
+            <p>No patients found.</p>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {filtered.map(patient => (
-            <Card key={patient.email} className="hover:border-primary/30 transition-colors">
-              <CardContent className="p-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-foreground truncate">{patient.name}</p>
-                    <p className="text-sm text-muted-foreground truncate">{patient.email}</p>
+        <div className="grid gap-4">
+          {filtered.map((patient, idx) => (
+            <Card key={patient.uid || idx} className="group overflow-hidden">
+              <CardContent className="p-0">
+                <div className="flex flex-col md:flex-row md:items-center justify-between p-5 gap-4">
+                  
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-lg">{patient.name}</h3>
+                      <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded-full border border-border/50">
+                        ID: {patient.uid}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
+                      {patient.email && <span>{patient.email}</span>}
+                      {patient.phone && <span>{patient.phone}</span>}
+                      {(!patient.email && !patient.phone) && <span className="italic">No contact info</span>}
+                    </div>
                     <div className="flex flex-wrap items-center gap-2 mt-2">
                       <Badge variant="outline" className="gap-1 text-xs">
                         <Calendar className="h-3 w-3" />{patient.appointmentCount} Appointment{patient.appointmentCount !== 1 ? 's' : ''}

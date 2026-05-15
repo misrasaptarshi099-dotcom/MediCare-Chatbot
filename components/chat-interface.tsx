@@ -8,11 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Mic, Send, Bot, User, Calendar, MapPin, CreditCard, Clock, Stethoscope,
   XCircle, CheckCircle2, RotateCcw, ListChecks, Volume2, VolumeX, PhoneCall,
-  Sparkles
+  Sparkles, Activity, Microscope
 } from 'lucide-react'
 import { CallbackForm } from './callback-form'
 import { AppointmentBooking } from './appointment-booking'
+import { DiagnosticBooking } from './diagnostic-booking'
 import { AuroraBackground } from './aurora-background'
+import { usePatient } from '@/lib/patient-context'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface ConversationMessage {
@@ -146,12 +148,11 @@ function BackgroundBlobs() {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export function ChatInterface({
-  initialEmail,
   initialMessages = []
 }: {
-  initialEmail?: string
   initialMessages?: any[]
 }) {
+  const { patient } = usePatient()
   const [messages, setMessages] = useState<Message[]>([])
   const [conversationHistory, setConversationHistory] = useState<ConversationMessage[]>([])
   const [isInitialized, setIsInitialized] = useState(false)
@@ -159,8 +160,10 @@ export function ChatInterface({
   const [isLoading, setIsLoading] = useState(false)
   const [showCallback, setShowCallback] = useState(false)
   const [showBooking, setShowBooking] = useState(false)
+  const [showDiagnosticBooking, setShowDiagnosticBooking] = useState(false)
+  const [selectedDiagnosticType, setSelectedDiagnosticType] = useState<'blood_test' | 'xray'>('blood_test')
   const [selectedDoctor, setSelectedDoctor] = useState<{
-    id: string; name: string; date: string; slots: string[]
+    id: string; name: string; date: string; slots: string[]; consultationFee: number
   } | null>(null)
   const [isListening, setIsListening] = useState(false)
   const [manageAction, setManageAction] = useState<{ appointmentId: string; action: 'cancel' | 'reschedule'; doctorId: string; doctorName: string; currentDate: string; currentTime: string } | null>(null)
@@ -319,7 +322,7 @@ export function ChatInterface({
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: userText, conversationHistory, email: initialEmail }),
+        body: JSON.stringify({ query: userText, conversationHistory, uid: patient?.uid }),
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error ?? 'Unknown API error')
@@ -462,7 +465,7 @@ export function ChatInterface({
 
     if (type === 'doctor_availability') {
       const doctor = data.doctor as { id: string; name: string; specialty: string; department: string; roomNumber: string; consultationFee: number }
-      const slots = data.availableSlots as string[]
+      const availabilityByDay = data.availabilityByDay as { day: string; slots: string[] }[]
       const date = data.date as string
       if (!doctor) return null
       return (
@@ -479,16 +482,23 @@ export function ChatInterface({
           <CardContent className="px-4 pb-4 space-y-3">
             <div className="flex gap-3 text-xs text-muted-foreground pl-1">
               <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{doctor.roomNumber}</span>
-              <span className="flex items-center gap-1"><CreditCard className="h-3 w-3" />${doctor.consultationFee}</span>
+              <span className="flex items-center gap-1"><CreditCard className="h-3 w-3" />₹{doctor.consultationFee}</span>
             </div>
-            {slots && slots.length > 0 && (
+            {availabilityByDay && availabilityByDay.length > 0 && (
               <div>
                 <p className="text-xs font-medium text-muted-foreground mb-2">Available Slots</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {slots.map(slot => (
-                    <Badge key={slot} variant="outline" className="text-xs gap-1 cursor-default">
-                      <Clock className="h-2.5 w-2.5" /> {slot}
-                    </Badge>
+                <div className="space-y-1.5">
+                  {availabilityByDay.map((dayData) => (
+                    <div key={dayData.day} className="flex flex-col gap-1.5 rounded-md px-3 py-2 bg-primary/5 border border-primary/10">
+                      <span className="text-xs font-semibold capitalize text-primary/80">{dayData.day}</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {dayData.slots.map(slot => (
+                          <Badge key={`${dayData.day}-${slot}`} variant="outline" className="text-xs gap-1 cursor-default bg-background">
+                            <Clock className="h-2.5 w-2.5 text-primary/60" /> {slot}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -497,12 +507,60 @@ export function ChatInterface({
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
               onClick={() => {
-                setSelectedDoctor({ id: doctor.id, name: doctor.name, date: date || new Date().toISOString().split('T')[0], slots: slots || [] })
+                setSelectedDoctor({ id: doctor.id, name: doctor.name, date: date || new Date().toISOString().split('T')[0], slots: [], consultationFee: doctor.consultationFee })
                 setShowBooking(true)
               }}
               className="w-full mt-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center justify-center gap-2 transition-all"
             >
               <Calendar className="h-3.5 w-3.5" /> Book Appointment
+            </motion.button>
+          </CardContent>
+        </Card>
+      )
+    }
+
+    if (type === 'diagnostics_info') {
+      const diagnosticType = data.diagnosticType as 'blood_test' | 'xray'
+      const tests = data.tests as { name: string; duration: string; basePrice: number }[]
+      
+      const Icon = diagnosticType === 'blood_test' ? Microscope : Activity
+      const title = diagnosticType === 'blood_test' ? 'Blood Tests & Pathology' : 'X-Ray & Imaging'
+
+      return (
+        <Card className="mt-3 border-blue-500/20 hover:border-blue-500/40 transition-colors bg-gradient-to-br from-blue-500/5 to-transparent backdrop-blur-sm overflow-hidden cursor-pointer" onClick={() => { setSelectedDiagnosticType(diagnosticType); setShowDiagnosticBooking(true); }}>
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+              <div className="w-7 h-7 rounded-full bg-blue-500/10 flex items-center justify-center">
+                <Icon className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+              </div>
+              {title}
+            </CardTitle>
+            <p className="text-xs text-muted-foreground pl-9">{tests.length} tests available</p>
+          </CardHeader>
+          <CardContent className="px-4 pb-4 space-y-3">
+            <div className="space-y-1.5">
+              {tests.map(test => (
+                <div key={test.name} className="flex items-center justify-between rounded-md px-3 py-2 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30">
+                  <span className="text-sm font-medium">{test.name}</span>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs border-blue-200 text-blue-700 dark:text-blue-300 dark:border-blue-800">
+                      ₹{test.basePrice}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={(e) => {
+                e.stopPropagation()
+                setSelectedDiagnosticType(diagnosticType)
+                setShowDiagnosticBooking(true)
+              }}
+              className="w-full mt-1 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium flex items-center justify-center gap-2 transition-all"
+            >
+              <Calendar className="h-3.5 w-3.5" /> Book {diagnosticType === 'blood_test' ? 'Lab Test' : 'Imaging'}
             </motion.button>
           </CardContent>
         </Card>
@@ -548,7 +606,21 @@ export function ChatInterface({
                       <span className="text-sm font-medium">{ins.name}</span>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-xs border-green-400 text-green-700 dark:text-green-300">{ins.coveragePercentage}% covered</Badge>
-                        <span className="text-xs text-muted-foreground">{ins.networkType}</span>
+                        {ins.networkType === 'Preferred' && (
+                          <Badge variant="outline" className="text-xs border-blue-400 text-blue-700 dark:text-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30">
+                            💳 Cashless
+                          </Badge>
+                        )}
+                        {ins.networkType === 'In-Network' && (
+                          <Badge variant="outline" className="text-xs border-amber-400 text-amber-700 dark:text-amber-300 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/30">
+                            🏥 In-Network
+                          </Badge>
+                        )}
+                        {ins.networkType === 'Out-of-Network' && (
+                          <Badge variant="outline" className="text-xs border-gray-400 text-gray-600 dark:text-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/30">
+                            📋 Reimbursement
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -562,7 +634,6 @@ export function ChatInterface({
                   {notCovered.map(ins => (
                     <div key={ins.name} className="flex items-center justify-between rounded-md px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
                       <span className="text-sm font-medium">{ins.name}</span>
-                      <span className="text-xs text-muted-foreground">{ins.networkType}</span>
                     </div>
                   ))}
                 </div>
@@ -1005,7 +1076,6 @@ export function ChatInterface({
               timestamp: Date.now(),
             }])
           }}
-          initialEmail={initialEmail}
         />
       )}
 
@@ -1016,7 +1086,7 @@ export function ChatInterface({
           doctorName={selectedDoctor.name}
           date={selectedDoctor.date}
           availableSlots={selectedDoctor.slots}
-          initialEmail={initialEmail}
+          consultationFee={selectedDoctor.consultationFee}
           onClose={() => setShowBooking(false)}
           onSuccess={(appointment) => {
             setShowBooking(false)
@@ -1024,6 +1094,21 @@ export function ChatInterface({
               id: Date.now().toString(),
               type: 'assistant',
               content: `Great news! Your appointment with ${appointment.doctorName} has been confirmed for ${appointment.date} at ${appointment.time}. Please arrive 15 minutes early.`,
+              timestamp: Date.now(),
+            }])
+          }}
+        />
+      )}
+      {showDiagnosticBooking && selectedDiagnosticType && (
+        <DiagnosticBooking
+          initialType={selectedDiagnosticType}
+          onClose={() => setShowDiagnosticBooking(false)}
+          onSuccess={(apt) => {
+            setShowDiagnosticBooking(false)
+            setMessages(prev => [...prev, {
+              id: Date.now().toString(),
+              type: 'assistant',
+              content: `✅ Your ${apt.service} appointment has been confirmed for ${apt.date} at ${apt.time}. We will send you a reminder email shortly.`,
               timestamp: Date.now(),
             }])
           }}

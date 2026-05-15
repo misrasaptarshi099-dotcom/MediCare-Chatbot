@@ -7,6 +7,21 @@ import {
   type Doctor,
 } from '@/lib/db'
 
+function normalizeToHHMM(value: string): string {
+  const trimmed = value.trim()
+  if (/^\d{2}:\d{2}$/.test(trimmed)) return trimmed
+
+  const timeParts = trimmed.match(/(\d+):(\d+)\s*(AM|PM)/i)
+  if (!timeParts) return trimmed
+
+  let hours = parseInt(timeParts[1], 10)
+  const minutes = timeParts[2]
+  const ampm = timeParts[3].toUpperCase()
+  if (ampm === 'PM' && hours < 12) hours += 12
+  if (ampm === 'AM' && hours === 12) hours = 0
+  return `${hours.toString().padStart(2, '0')}:${minutes}`
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const doctorId = searchParams.get('doctorId')
@@ -49,7 +64,7 @@ export async function GET(request: Request) {
     const bookedTimesSet = new Set(
       appointments
         .filter(apt => apt.doctorId === resolvedDoctorId && apt.date === date && apt.status === 'scheduled')
-        .map(apt => apt.time)
+        .map(apt => normalizeToHHMM(apt.time))
     )
 
     // Match HH:mm against a display slot like "11:00 AM"
@@ -92,10 +107,10 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { patientName, patientPhone, patientEmail, doctorId, date, time, service } = body
+    const { patientName, patientPhone, patientEmail, patientUid, doctorId, date, time, service, paymentStatus, amount } = body
 
-    if (!patientName || !patientPhone || (!doctorId && !body.doctorName) || !date || !time) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    if (!patientName || (!patientPhone && !patientEmail && !patientUid) || (!doctorId && !body.doctorName) || !date || !time) {
+      return NextResponse.json({ error: 'Missing required fields. Please provide at least a phone number or email.' }, { status: 400 })
     }
 
     const doctors = await getDoctors()
@@ -118,8 +133,13 @@ export async function POST(request: Request) {
     const resolvedDoctorId = doctor.id
 
     // Check if slot is available
+    const normalizedRequestedTime = normalizeToHHMM(time)
     const existingAppointment = appointments.find(
-      apt => apt.doctorId === resolvedDoctorId && apt.date === date && apt.time === time && apt.status === 'scheduled'
+      apt =>
+        apt.doctorId === resolvedDoctorId &&
+        apt.date === date &&
+        normalizeToHHMM(apt.time) === normalizedRequestedTime &&
+        apt.status === 'scheduled'
     )
 
     if (existingAppointment) {
@@ -131,12 +151,15 @@ export async function POST(request: Request) {
       patientName,
       patientPhone,
       patientEmail: patientEmail || '',
+      patientUid: patientUid || undefined,
       doctorId: resolvedDoctorId,
       doctorName: doctor.name,
       date,
-      time,
+      time: normalizedRequestedTime,
       service: service || 'General Consultation',
       status: 'scheduled',
+      paymentStatus: paymentStatus || 'unpaid',
+      amount: amount || doctor.consultationFee || 0,
       createdAt: new Date().toISOString()
     }
 

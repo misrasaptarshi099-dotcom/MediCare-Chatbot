@@ -5,7 +5,8 @@ import {
   getCallbackTickets,
   getChatSession,
   getWaitlist,
-  getPatientReports,
+  getPatientReportsByUid,
+  getPatientByUid,
   type Appointment,
   type CallbackTicket,
   type WaitlistEntry,
@@ -14,21 +15,31 @@ import {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
-  const email = searchParams.get('email')
+  const uid = searchParams.get('uid')
 
-  if (!email) {
-    return NextResponse.json({ error: 'Email is required' }, { status: 400 })
+  if (!uid) {
+    return NextResponse.json({ error: 'UID is required' }, { status: 400 })
   }
 
   try {
-    const normalizedEmail = email.toLowerCase().trim()
+    const patient = await getPatientByUid(uid)
+    if (!patient) {
+      return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
+    }
 
-    // Appointments
+    const email = patient.email?.toLowerCase().trim()
+
+    // Appointments (match by patientUid or fallback to email if old record)
     let userAppointments: Appointment[] = []
     try {
       const appointments = await getAllAppointments()
       userAppointments = appointments
-        .filter(apt => apt.patientEmail?.toLowerCase().trim() === normalizedEmail)
+        .filter(apt => {
+          if (apt.patientUid === uid) return true
+          if (email && apt.patientEmail?.toLowerCase().trim() === email) return true
+          if (patient.phone && apt.patientPhone === patient.phone) return true
+          return false
+        })
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     } catch {}
 
@@ -37,18 +48,23 @@ export async function GET(request: Request) {
     try {
       const tickets = await getCallbackTickets()
       userCallbacks = tickets
-        .filter(cb => cb.patientEmail?.toLowerCase().trim() === normalizedEmail)
+        .filter(cb => {
+          if (cb.patientUid === uid) return true
+          if (email && cb.patientEmail?.toLowerCase().trim() === email) return true
+          if (patient.phone && cb.patientPhone === patient.phone) return true
+          return false
+        })
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     } catch {}
 
     // Chats
     let userChats: { id: string, type: string, content: string, timestamp: number }[] = []
     try {
-      const session = await getChatSession(normalizedEmail)
+      const session = await getChatSession(uid)
       if (session?.messages) userChats = session.messages
     } catch {}
 
-    // Waitlist entries for this patient, with their position in each slot's queue
+    // Waitlist entries
     let userWaitlist: (WaitlistEntry & { position: number })[] = []
     try {
       const waitlist = await getWaitlist()
@@ -60,19 +76,25 @@ export async function GET(request: Request) {
           const position = slotQueue.findIndex(e => e.id === entry.id) + 1
           return { ...entry, position }
         })
-        .filter(e => e.patientEmail?.toLowerCase().trim() === normalizedEmail)
+        .filter(e => {
+          if (e.patientUid === uid) return true
+          if (email && e.patientEmail?.toLowerCase().trim() === email) return true
+          if (patient.phone && e.patientPhone === patient.phone) return true
+          return false
+        })
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     } catch {}
 
-    // Reports
+    // Reports — strict UID-based as requested
     let userReports: LabReport[] = []
     try {
-      userReports = await getPatientReports(normalizedEmail)
+      userReports = await getPatientReportsByUid(uid)
     } catch (e) {
       console.error('Error fetching patient reports:', e)
     }
 
     return NextResponse.json({
+      patient,
       appointments: userAppointments,
       callbacks: userCallbacks,
       chats: userChats,

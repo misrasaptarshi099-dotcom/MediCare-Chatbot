@@ -64,9 +64,9 @@ export async function GET(request: Request) {
 // POST — join the waitlist for a slot
 export async function POST(request: Request) {
   const body = await request.json()
-  const { doctorId, doctorName, date, time, patientName, patientEmail, patientPhone, service } = body
+  const { doctorId, doctorName, date, time, patientName, patientEmail, patientPhone, patientUid, service } = body
 
-  if (!date || !time || !patientName || !patientEmail || !patientPhone) {
+  if (!date || !time || !patientName || (!patientPhone && !patientEmail && !patientUid)) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
@@ -98,8 +98,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `The waiting list for this slot is full (max ${WAITLIST_MAX}).`, isFull: true }, { status: 409 })
     }
 
-    // Prevent duplicate entries for same patient in same slot
-    const already = existing.find(e => e.patientEmail.toLowerCase() === patientEmail.toLowerCase())
+    // Prevent duplicate entries for same patient in same slot (match by uid, phone, or email)
+    const already = existing.find(e => {
+      if (patientUid && (e as any).patientUid === patientUid) return true
+      if (patientPhone && e.patientPhone === patientPhone) return true
+      if (patientEmail && e.patientEmail && e.patientEmail.toLowerCase() === patientEmail.toLowerCase()) return true
+      return false
+    })
     if (already) {
       return NextResponse.json({ error: 'You are already on the waiting list for this slot.', alreadyOnList: true }, { status: 409 })
     }
@@ -111,10 +116,11 @@ export async function POST(request: Request) {
       date,
       time,
       patientName,
-      patientEmail,
-      patientPhone,
+      patientEmail: patientEmail || '',
+      patientPhone: patientPhone || '',
       service: service || 'General Consultation',
       createdAt: new Date().toISOString(),
+      ...(patientUid ? { patientUid } : {}),
     }
 
     await addWaitlistEntry(entry)

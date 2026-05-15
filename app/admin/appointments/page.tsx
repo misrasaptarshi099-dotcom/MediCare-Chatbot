@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Calendar, Clock, User, Phone, Mail, CheckCircle2, XCircle, AlertCircle, ListOrdered } from 'lucide-react'
 import Link from 'next/link'
 
@@ -20,6 +21,8 @@ interface Appointment {
   time: string
   service: string
   status: 'scheduled' | 'completed' | 'cancelled'
+  paymentStatus?: 'paid' | 'unpaid' | 'refunded'
+  amount?: number
   createdAt: string
 }
 
@@ -78,11 +81,122 @@ export default function AppointmentsPage() {
     }
   }
 
+  const categorizeApt = (service: string) => {
+    const s = service.toLowerCase()
+    if (s.includes('x-ray') || s.includes('xray') || s.includes('scan') || s.includes('mri') || s.includes('ultrasound')) {
+      return 'xray'
+    }
+    if (s.includes('blood') || s.includes('panel') || s.includes('cbc') || s.includes('lft') || s.includes('kft') || s.includes('tft')) {
+      return 'blood'
+    }
+    return 'general'
+  }
+
   // Get tomorrow's appointments for preparation checklist
   const tomorrow = new Date()
   tomorrow.setDate(tomorrow.getDate() + 1)
   const tomorrowStr = tomorrow.toISOString().split('T')[0]
   const tomorrowAppointments = appointments.filter(apt => apt.date === tomorrowStr && apt.status === 'scheduled')
+
+  const renderTable = (categoryApts: Appointment[]) => (
+    <Card>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Patient</TableHead>
+              <TableHead>Doctor</TableHead>
+              <TableHead>Date & Time</TableHead>
+              <TableHead>Contact</TableHead>
+              <TableHead>Payment</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {categoryApts.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  No appointments found
+                </TableCell>
+              </TableRow>
+            ) : (
+              categoryApts.map((apt) => (
+                <TableRow key={apt.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">{apt.patientName}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>{apt.doctorName}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <span>{apt.date}</span>
+                      <Clock className="h-4 w-4 text-muted-foreground ml-2" />
+                      <span>{apt.time}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1 text-sm">
+                        <Phone className="h-3 w-3" />
+                        {apt.patientPhone}
+                      </div>
+                      {apt.patientEmail && (
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Mail className="h-3 w-3" />
+                          {apt.patientEmail}
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      {(apt as any).amount != null && (
+                        <span className="text-xs font-medium">₹{(apt as any).amount}</span>
+                      )}
+                      <Badge className={`w-fit text-xs border ${
+                        (apt as any).paymentStatus === 'paid'
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                          : (apt as any).paymentStatus === 'refunded'
+                          ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300 border-orange-200 dark:border-orange-800'
+                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800'
+                      }`}>
+                        {(apt as any).paymentStatus === 'paid' ? '✓ Paid' : (apt as any).paymentStatus === 'refunded' ? '↩ Refunded' : '⏳ Unpaid'}
+                      </Badge>
+                    </div>
+                  </TableCell>
+                  <TableCell>{getStatusBadge(apt.status)}</TableCell>
+                  <TableCell className="text-right">
+                    {apt.status === 'scheduled' && (
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => updateStatus(apt.id, 'completed')}
+                        >
+                          <CheckCircle2 className="h-4 w-4 text-accent" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => updateStatus(apt.id, 'cancelled')}
+                        >
+                          <XCircle className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  )
 
   return (
     <div className="space-y-6">
@@ -135,7 +249,7 @@ export default function AppointmentsPage() {
       )}
 
       {/* Filter Buttons */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 mb-4">
         {(['all', 'scheduled', 'completed', 'cancelled'] as const).map((status) => (
           <Button
             key={status}
@@ -149,86 +263,22 @@ export default function AppointmentsPage() {
         ))}
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Patient</TableHead>
-                <TableHead>Doctor</TableHead>
-                <TableHead>Date & Time</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredAppointments.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    No appointments found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredAppointments.map((apt) => (
-                  <TableRow key={apt.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">{apt.patientName}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{apt.doctorName}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span>{apt.date}</span>
-                        <Clock className="h-4 w-4 text-muted-foreground ml-2" />
-                        <span>{apt.time}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1 text-sm">
-                          <Phone className="h-3 w-3" />
-                          {apt.patientPhone}
-                        </div>
-                        {apt.patientEmail && (
-                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                            <Mail className="h-3 w-3" />
-                            {apt.patientEmail}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>{getStatusBadge(apt.status)}</TableCell>
-                    <TableCell className="text-right">
-                      {apt.status === 'scheduled' && (
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => updateStatus(apt.id, 'completed')}
-                          >
-                            <CheckCircle2 className="h-4 w-4 text-accent" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => updateStatus(apt.id, 'cancelled')}
-                          >
-                            <XCircle className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="general" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="blood">Blood Tests</TabsTrigger>
+          <TabsTrigger value="xray">X-Ray & Imaging</TabsTrigger>
+        </TabsList>
+        <TabsContent value="general">
+          {renderTable(filteredAppointments.filter(apt => categorizeApt(apt.service) === 'general'))}
+        </TabsContent>
+        <TabsContent value="blood">
+          {renderTable(filteredAppointments.filter(apt => categorizeApt(apt.service) === 'blood'))}
+        </TabsContent>
+        <TabsContent value="xray">
+          {renderTable(filteredAppointments.filter(apt => categorizeApt(apt.service) === 'xray'))}
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

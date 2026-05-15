@@ -6,6 +6,8 @@ import {
   addUnansweredQuery,
   getChatSession,
   saveChatSession,
+  getInsurancePartners,
+  getDoctors,
   type Appointment,
   type UnansweredQuery,
   type ChatMessage as DbChatMessage,
@@ -30,6 +32,85 @@ interface ParsedAIResponse {
     data: Record<string, unknown>
     message: string
   }>
+}
+
+// ── Helper: detect "list all coverage by department" intent ────────────────────
+function isAllDepartmentCoverageQuery(query: string): boolean {
+  const q = query.toLowerCase()
+  const hasListAll = /list all|show all|all coverage|all insurance|all department/.test(q)
+  const hasDept = /department|specialty|all of them|each department|per department|by department/.test(q)
+  const hasCoverage = /cover|insurance|insur/.test(q)
+  // "list one department then all the insurance … another department" type queries
+  const isExplicitMulti = /one department.*another|department.*then.*department|each|per/.test(q)
+  return (hasListAll && (hasDept || hasCoverage)) || isExplicitMulti
+}
+
+// ── Department → procedure slug mapping ───────────────────────────────────────
+// Maps department/specialty keywords to the procedure slugs used in insurance data.
+const DEPT_PROCEDURE_MAP: Record<string, string[]> = {
+  orthoped:   ['knee-consultation', 'knee-surgery'],
+  cardio:     ['heart-checkup', 'heart-surgery'],
+  neuro:      ['neuro-consultation', 'neuro-surgery'],
+  pathol:     ['blood-test'],
+  radiol:     ['x-ray', 'mri-scan', 'ct-scan', 'ultrasound'],
+  pediat:     ['pediatric-checkup'],
+  blood:      ['blood-test'],
+  'x-ray':    ['x-ray', 'mri-scan', 'ct-scan', 'ultrasound'],
+}
+
+function getProcedureSlugsForDept(specialty: string): string[] {
+  const s = specialty.toLowerCase()
+  for (const [key, slugs] of Object.entries(DEPT_PROCEDURE_MAP)) {
+    if (s.includes(key)) return slugs
+  }
+  return [] // unknown specialty — will result in "not covered" unless insurer covers something
+}
+
+// ── Helper: build all-department coverage results from DB ─────────────────────
+async function buildAllDepartmentCoverageResults() {
+  const [insurers, doctors] = await Promise.all([getInsurancePartners(), getDoctors()])
+
+  // Build unique departments with their specialty and display label
+  const deptMap = new Map<string, { label: string; slugs: string[] }>()
+  for (const doc of doctors) {
+    if (!deptMap.has(doc.department)) {
+      const slugs = getProcedureSlugsForDept(doc.specialty || doc.department)
+      deptMap.set(doc.department, { label: doc.specialty || doc.department, slugs })
+    }
+  }
+  // Ensure diagnostic departments are included
+  if (!deptMap.has('Blood Testing')) {
+    deptMap.set('Blood Testing', { label: 'Blood Testing', slugs: ['blood-test'] })
+  }
+  if (!deptMap.has('X-Ray & Imaging')) {
+    deptMap.set('X-Ray & Imaging', { label: 'X-Ray & Imaging', slugs: ['x-ray', 'mri-scan', 'ct-scan', 'ultrasound'] })
+  }
+
+  const structuredResults = []
+  for (const [department, { label, slugs }] of deptMap.entries()) {
+    const allInsurers = insurers.map(ins => {
+      // An insurer covers this department if ANY of the department's procedure slugs
+      // appear in the insurer's proceduresCovered list.
+      const covered = slugs.length > 0 && ins.proceduresCovered.some(p => slugs.includes(p))
+      return {
+        name: ins.name,
+        covered,
+        coveragePercentage: covered ? ins.coveragePercentage : 0,
+        networkType: ins.networkType,
+      }
+    })
+
+    structuredResults.push({
+      type: 'insurance_coverage',
+      data: {
+        procedure: `${department} — ${label}`,
+        allInsurers,
+      },
+      message: `Insurance coverage for ${department}`,
+    })
+  }
+
+  return structuredResults
 }
 
 // ── Helper: get booked slots for today ───────────────────────────────────────
@@ -74,7 +155,7 @@ async function callGeminiWithRetry(
     systemInstruction: systemPrompt,
     generationConfig: {
       temperature: 0.3,
-      maxOutputTokens: 2500,
+      maxOutputTokens: 4096,
       responseMimeType: 'application/json',
     },
   })
@@ -90,21 +171,99 @@ async function callGeminiWithRetry(
       const msg = err instanceof Error ? err.message : ''
       const isQuotaError = msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('429')
       if (isQuotaError && attempt < maxRetries - 1) {
-        // Exponential backoff: 2s, 4s, 8s …
         const delayMs = Math.pow(2, attempt + 1) * 1000
         console.warn(`Gemini quota hit, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})`)
         await new Promise(resolve => setTimeout(resolve, delayMs))
         continue
       }
-      throw err  // non-quota error or last attempt → propagate
+      throw err
     }
   }
   throw lastError
 }
 
+// ── Build system prompt ───────────────────────────────────────────────────────
+function buildSystemPrompt(hospitalContext: string, bookedContext: string, patientAppointmentsContext: string): string {
+  return [
+    'You are MediCare AI, a helpful hospital assistant chatbot.',
+    'You help patients with doctor availability, appointment information, insurance coverage, department locations, visiting hours, and general hospital queries.',
+    'You can also help patients cancel or reschedule their own appointments.',
+    '',
+    'Use ONLY the data below to answer questions — do not invent doctors, departments, or prices.',
+    'Be conversational, empathetic, and concise. Format slot times clearly (e.g. "9:00 AM").',
+    'If you cannot answer from the data provided, set needsEscalation to true.',
+    '',
+    hospitalContext + bookedContext + patientAppointmentsContext,
+    '',
+    '=== CONVERSATION CONTEXT RULES (READ CAREFULLY) ===',
+    'You have access to the full conversation history. Use it aggressively to resolve ambiguity:',
+    '- If the user says "it", "this", "that", or "the same" — resolve the pronoun from recent messages.',
+    '  Example: if they just asked about a Knee Consultation, "it" means Knee Consultation.',
+    '- If the user says "this doctor" or "the doctor" — use the doctor most recently discussed.',
+    '- If the user says "this department" or "that specialty" — use the department/specialty most recently mentioned.',
+    '- If a query is vague, make a reasonable inference from context rather than asking for clarification repeatedly.',
+    '- If the user has already been asked for clarification and asks something similar again, make your best inference and answer — do NOT ask again.',
+    '',
+    '=== INSURANCE RULES ===',
+    '- ANY question about insurance, coverage, or whether a procedure/treatment is covered triggers intent "check_insurance".',
+    '- ALWAYS return a structuredResult with type "insurance_coverage".',
+    '- Populate "allInsurers" with EVERY insurer from the INSURANCE PARTNERS data — never omit any.',
+    '- Each insurer must have: name, covered (true/false based on whether the procedure is in their proceduresCovered list), coveragePercentage, networkType.',
+    '- Infer the "procedure" from conversation context:',
+    '  - If the user last asked about Dr. Mehta (Orthopedic) → procedure = "Orthopedic Surgery"',
+    '  - If the user says "this department" → use whatever department was last discussed',
+    '  - If no specific procedure can be inferred → use "General Services" and mark all as covered',
+    '- NEVER ask for clarification before returning the insurance card. Always make your best inference.',
+    '- "List all coverages", "show all insurance", "what is covered" → return insurance_coverage with ALL insurers.',
+    '- Questions about a specific insurer (e.g. "does Tata AIG cover it?") → still return ALL insurers in allInsurers, but mention the specific insurer in your message.',
+    '',
+    '=== BOOKING, CANCELLATION & RESCHEDULING RULES ===',
+    '- When the user wants to BOOK a doctor appointment: ALWAYS include a structuredResult with type "doctor_availability" containing the full doctor object and availabilityByDay. This is mandatory — the Book Appointment button ONLY renders when this is present.',
+    '- IMPORTANT: If the user wants to BOOK a lab test, blood test, CBC, MRI, X-Ray, or diagnostic service, DO NOT return "doctor_availability". Return a "diagnostics_info" structuredResult instead.',
+    '- CANCEL: return manage_appointment with action "cancel". RESCHEDULE: return manage_appointment with action "reschedule".',
+    '- If the patient has no appointments, tell them kindly.',
+    '',
+    '=== GENERAL RULES ===',
+    '- For billing/account-specific questions: always escalate.',
+    '- When listing available slots, exclude any already booked.',
+    '- LANGUAGE RULE: Detect the user\'s language and reply in the SAME language. Mirror it exactly in the "message" field. Keep structured data (doctor names, times, dates) in their original form.',
+    '- NEVER respond with a generic error or "I had trouble processing that" when the data is available. Always attempt to answer from context and data.',
+    '',
+    'You MUST respond ONLY with valid JSON — no markdown, no backticks, no extra text whatsoever.',
+    'Use this exact schema:',
+    '{',
+    '  "message": "Your friendly response to the user",',
+    '  "intent": "one of: check_availability | check_insurance | visiting_hours | find_location | billing_query | department_info | cancel_appointment | reschedule_appointment | general | unknown",',
+    '  "needsEscalation": false,',
+    '  "escalationReason": "only include this field if needsEscalation is true",',
+    '  "structuredResults": [',
+    '    {',
+    '      "type": "doctor_availability | insurance_coverage | visiting_hours | location | department_info | manage_appointment | diagnostics_info",',
+    '      "data": {',
+    '        "doctor": { "id": "string", "name": "string", "specialty": "string", "department": "string", "roomNumber": "string", "consultationFee": 0 },',
+    '        "availableSlots": ["9:00 AM"],',
+    '        "availabilityByDay": [{ "day": "Monday", "slots": ["9:00 AM", "10:00 AM"] }],',
+    '        "date": "2023-11-01",',
+    '        "procedure": "human-readable procedure name e.g. Knee Consultation",',
+    '        "allInsurers": [{ "name": "ICICI Lombard", "covered": true, "coveragePercentage": 80, "networkType": "Preferred" }],',
+    '        "appointment": { "id": "apt-xxx", "doctorName": "string", "date": "2023-11-01", "time": "09:00", "service": "string", "status": "scheduled" },',
+    '        "action": "cancel or reschedule",',
+    '        "diagnosticType": "blood_test | xray",',
+    '        "tests": [{ "name": "Complete Blood Count (CBC)", "duration": "30", "basePrice": 400 }]',
+    '      },',
+    '      "message": "short human-readable summary"',
+    '    }',
+    '  ]',
+    '}',
+    '',
+    'DIAGNOSTICS RULE: When asked to book, check, or inquire about blood tests, lab tests, CBC, MRI, ultrasound, or x-rays, ALWAYS return a structuredResult of type "diagnostics_info" with "diagnosticType" set to either "blood_test" or "xray" and a "tests" array populated with the available tests from the SERVICES & PRICING data. NEVER list the tests in plain text.',
+    'DOCTOR AVAILABILITY RULE: When asked about a doctor\'s availability, ALWAYS return a structuredResult of type "doctor_availability" with "availabilityByDay" populated with the days and slots. NEVER list the availability in plain text.',
+  ].join('\n')
+}
+
 // ── POST /api/chat ────────────────────────────────────────────────────────────
 export async function POST(request: Request) {
-  let userEmail: string | undefined
+  let userUid: string | undefined
   let userQuery: string | undefined
 
   try {
@@ -114,7 +273,7 @@ export async function POST(request: Request) {
       conversationHistory?: ChatMessage[]
     }
     userQuery = query
-    userEmail = body.email
+    userUid = body.uid
 
     if (!query?.trim()) {
       return NextResponse.json({ error: 'Query is required' }, { status: 400 })
@@ -127,19 +286,50 @@ export async function POST(request: Request) {
       )
     }
 
+    // ── SHORT-CIRCUIT: All-department coverage query ───────────────────────────
+    // This type of query reliably overflows the AI's token budget, so we handle
+    // it directly from the database instead of sending it to Gemini.
+    if (isAllDepartmentCoverageQuery(query)) {
+      const allCoverageResults = await buildAllDepartmentCoverageResults()
+      const responseMessage = `Here's a full breakdown of insurance coverage for each department at MediCare. Each card shows which insurers cover that department's services and at what percentage.`
+
+      // Persist chat history
+      if (body.uid) {
+        try {
+          const existing = await getChatSession(body.uid)
+          const existingMessages = existing?.messages ?? []
+          const timestamp = Date.now()
+          existingMessages.push(
+            { id: `u-${timestamp}`, type: 'user', content: query, timestamp },
+            { id: `a-${timestamp}`, type: 'assistant', content: responseMessage, timestamp }
+          )
+          await saveChatSession(body.uid, existingMessages, new Date().toISOString())
+        } catch {}
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: responseMessage,
+        intent: 'check_insurance',
+        results: allCoverageResults,
+        totalResults: allCoverageResults.length,
+        needsEscalation: false,
+      })
+    }
+
     // Build live hospital context from Firestore
     const [hospitalContext, bookedContext] = await Promise.all([
       buildHospitalContext(),
       getBookedSlotsContext(),
     ])
 
-    // --- Fetch patient's own appointments if email is provided ---
+    // --- Fetch patient's own appointments if uid is provided ---
     let patientAppointmentsContext = ''
-    if (body.email) {
+    if (body.uid) {
       try {
         const appointments = await getAllAppointments()
         const patientApts = appointments.filter(
-          a => a.patientEmail?.toLowerCase() === body.email?.toLowerCase() && a.status === 'scheduled'
+          a => (a.patientUid === body.uid || (body.email && a.patientEmail?.toLowerCase() === body.email?.toLowerCase())) && a.status === 'scheduled'
         )
         if (patientApts.length > 0) {
           const lines = patientApts.map(a =>
@@ -150,72 +340,7 @@ export async function POST(request: Request) {
       } catch {}
     }
 
-    const systemPrompt = `You are MediCare AI, a helpful hospital assistant chatbot.
-You help patients with doctor availability, appointment information, insurance coverage, department locations, visiting hours, and general hospital queries.
-You can also help patients cancel or reschedule their own appointments.
-
-Use ONLY the data below to answer questions — do not invent doctors, departments, or prices.
-Be conversational, empathetic, and concise. Format slot times clearly (e.g. "9:00 AM").
-If you cannot answer from the data provided, set needsEscalation to true.
-
-${hospitalContext}${bookedContext}${patientAppointmentsContext}
-
-IMPORTANT RULES:
-- For billing/account-specific questions: always escalate.
-- For questions about doctors/departments/insurance NOT in the data: escalate.
-- When listing available slots, exclude any marked as already booked.
-- LANGUAGE RULE (CRITICAL): Detect the language of the user's message and reply in that SAME language. If the user writes in Hindi, reply in Hindi. If in Tamil, reply in Tamil. If in English, reply in English. Mirror the user's language exactly in the "message" field. Keep structured data fields (doctor names, times, dates) in their original form.
-- CRITICAL: When the user wants to BOOK an appointment with any doctor, you MUST ALWAYS include a structuredResult with type "doctor_availability" containing the full doctor object and their availableSlots for today (or the requested date). This is mandatory — the "Book Appointment" button is ONLY rendered by the UI when this structuredResult is present. Never just tell them to click a button without emitting this result.
-- If the user wants to CANCEL an appointment: find their appointment from THIS PATIENT'S UPCOMING APPOINTMENTS and return a manage_appointment structuredResult with action "cancel".
-- If the user wants to RESCHEDULE: return a manage_appointment structuredResult with action "reschedule" and include available slots for them to pick from.
-- If the patient has no appointments, tell them so kindly.
-
-You MUST respond ONLY with valid JSON — no markdown, no backticks, no extra text whatsoever.
-Use this exact schema:
-{
-  "message": "Your friendly response to the user",
-  "intent": "one of: check_availability | check_insurance | visiting_hours | find_location | billing_query | department_info | cancel_appointment | reschedule_appointment | general | unknown",
-  "needsEscalation": false,
-  "escalationReason": "only include this field if needsEscalation is true",
-  "structuredResults": [
-    {
-      "type": "doctor_availability | insurance_coverage | visiting_hours | location | department_info | manage_appointment",
-      "data": {
-        "doctor": {
-           "id": "string",
-           "name": "string",
-           "specialty": "string",
-           "department": "string",
-           "roomNumber": "string",
-           "consultationFee": 0
-        },
-        "availableSlots": ["9:00 AM"],
-        "date": "2023-11-01",
-        "procedure": "human-readable procedure name e.g. Knee Consultation",
-        "allInsurers": [
-          {
-            "name": "ICICI Lombard",
-            "covered": true,
-            "coveragePercentage": 80,
-            "networkType": "Preferred"
-          }
-        ],
-        "appointment": {
-          "id": "apt-xxx",
-          "doctorName": "string",
-          "date": "2023-11-01",
-          "time": "09:00",
-          "service": "string",
-          "status": "scheduled"
-        },
-        "action": "cancel or reschedule"
-      },
-      "message": "short human-readable summary"
-    }
-  ]
-}
-
-INSURANCE RULE: When intent is check_insurance, ALWAYS return a structuredResult of type "insurance_coverage" with "allInsurers" populated — include EVERY insurer from the insurance data showing whether each one covers the procedure (covered: true/false), their coverage percentage, and network type. Never return just a single insurer — always return the full list.`
+    const systemPrompt = buildSystemPrompt(hospitalContext, bookedContext, patientAppointmentsContext)
 
     // Convert conversation history: 'assistant' → 'model' for Gemini API
     const geminiHistory = conversationHistory.map(m => ({
@@ -244,10 +369,10 @@ INSURANCE RULE: When intent is check_insurance, ALWAYS return a structuredResult
       await logUnansweredQuery(query, parsed.escalationReason ?? 'Escalated by AI')
     }
 
-    // Persist chat history if an email is provided
-    if (body.email) {
+    // Persist chat history if a UID is provided
+    if (body.uid) {
       try {
-        const existing = await getChatSession(body.email)
+        const existing = await getChatSession(body.uid)
         const existingMessages = existing?.messages ?? []
 
         const timestamp = Date.now()
@@ -255,7 +380,7 @@ INSURANCE RULE: When intent is check_insurance, ALWAYS return a structuredResult
         const aiMsg: DbChatMessage = { id: `a-${timestamp}`, type: 'assistant', content: parsed.message, timestamp }
 
         existingMessages.push(userMsg, aiMsg)
-        await saveChatSession(body.email, existingMessages, new Date().toISOString())
+        await saveChatSession(body.uid, existingMessages, new Date().toISOString())
       } catch (err) {
         console.error('Failed to save chat history:', err)
       }
@@ -278,15 +403,14 @@ INSURANCE RULE: When intent is check_insurance, ALWAYS return a structuredResult
     const message = error instanceof Error ? error.message : 'Unknown error'
 
     // ── ALWAYS save the user's message, even when the AI call fails ──────
-    if (userEmail && userQuery) {
+    if (userUid && userQuery) {
       try {
-        const existing = await getChatSession(userEmail)
+        const existing = await getChatSession(userUid)
         const existingMessages = existing?.messages ?? []
 
         const timestamp = Date.now()
         const userMsg: DbChatMessage = { id: `u-${timestamp}`, type: 'user', content: userQuery, timestamp }
 
-        // Determine a human-friendly error reply to persist
         let errorReply = "I'm sorry, something went wrong. Please try again."
         if (message.includes('quota') || message.includes('RESOURCE_EXHAUSTED')) {
           errorReply = "I'm temporarily overloaded. Please try again in a moment."
@@ -294,7 +418,7 @@ INSURANCE RULE: When intent is check_insurance, ALWAYS return a structuredResult
         const aiMsg: DbChatMessage = { id: `a-${timestamp}`, type: 'assistant', content: errorReply, timestamp }
 
         existingMessages.push(userMsg, aiMsg)
-        await saveChatSession(userEmail, existingMessages, new Date().toISOString())
+        await saveChatSession(userUid, existingMessages, new Date().toISOString())
       } catch (saveErr) {
         console.error('Failed to save chat history on error path:', saveErr)
       }

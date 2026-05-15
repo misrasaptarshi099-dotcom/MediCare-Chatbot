@@ -1,14 +1,26 @@
 import { NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
-import { saveOtp, getOtp, deleteOtp } from '@/lib/db'
+import { saveOtp } from '@/lib/db'
 
 const OTP_TTL_MS = 10 * 60 * 1000 // 10 minutes
 
 export async function POST(request: Request) {
-  const { email } = await request.json()
+  const { identifier } = await request.json()
 
-  if (!email || typeof email !== 'string') {
-    return NextResponse.json({ error: 'Email is required' }, { status: 400 })
+  if (!identifier || typeof identifier !== 'string') {
+    return NextResponse.json({ error: 'Identifier (email or phone) is required' }, { status: 400 })
+  }
+
+  let normalizedIdentifier = identifier.trim()
+  const isPhone = /^\+?[0-9]{10,15}$/.test(normalizedIdentifier)
+
+  // Ensure phone numbers have a country code (default to +91 for India if missing)
+  if (isPhone && !normalizedIdentifier.startsWith('+')) {
+    if (normalizedIdentifier.length === 10) {
+      normalizedIdentifier = '+91' + normalizedIdentifier
+    } else {
+      normalizedIdentifier = '+' + normalizedIdentifier
+    }
   }
 
   // Generate a secure 6-digit OTP
@@ -16,7 +28,15 @@ export async function POST(request: Request) {
   const expiresAt = Date.now() + OTP_TTL_MS
 
   // Persist the OTP in Firestore
-  await saveOtp(email, code, expiresAt, 'patient')
+  await saveOtp(normalizedIdentifier, code, expiresAt, 'patient')
+
+  if (isPhone) {
+    // MOCK SMS SENDING
+    // In a real production app, you would integrate Twilio, MSG91, AWS SNS here,
+    // OR use Firebase Client SDK's signInWithPhoneNumber (which bypasses this endpoint).
+    console.log(`\n\n📱 [MOCK SMS] OTP for ${normalizedIdentifier} is: ${code}\n\n`)
+    return NextResponse.json({ success: true, message: 'OTP sent to phone (mock)' })
+  }
 
   // Send the OTP via email
   try {
@@ -30,7 +50,7 @@ export async function POST(request: Request) {
 
     await transporter.sendMail({
       from: `"MediCare Patient Portal" <${process.env.EMAIL_USER}>`,
-      to: email,
+      to: normalizedIdentifier,
       subject: 'Your MediCare Login Code',
       html: `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px; background: #f9fafb; border-radius: 12px;">

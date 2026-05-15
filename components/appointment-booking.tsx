@@ -7,12 +7,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { X, Clock, Calendar, ListPlus, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { usePatient } from '@/lib/patient-context'
 
 interface AppointmentBookingProps {
   doctorId: string
   doctorName: string
   date: string
   availableSlots: string[]
+  consultationFee: number
   bookedSlots?: string[]
   onClose: () => void
   onSuccess: (appointment: { doctorName: string; date: string; time: string }) => void
@@ -24,23 +26,28 @@ export function AppointmentBooking({
   doctorName,
   date,
   availableSlots,
+  consultationFee,
   bookedSlots = [],
   onClose,
   onSuccess,
   initialEmail
 }: AppointmentBookingProps) {
+  const { patient } = usePatient()
+
   const [formData, setFormData] = useState({
-    patientName: '',
-    patientPhone: '',
-    patientEmail: initialEmail || ''
+    patientName: patient?.name || '',
+    patientPhone: patient?.phone || '',
+    patientEmail: patient?.email || initialEmail || ''
   })
   const [selectedDate, setSelectedDate] = useState<string>(date)
   const [currentSlots, setCurrentSlots] = useState<string[]>(availableSlots)
   const [currentBookedSlots, setCurrentBookedSlots] = useState<string[]>(bookedSlots)
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isFetchingSlots, setIsFetchingSlots] = useState(false)
+  const [isFetchingSlots, setIsFetchingSlots] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [paymentMethod, setPaymentMethod] = useState<'now' | 'later'>('now')
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false)
 
   // Waitlist state
   const [showWaitlistPrompt, setShowWaitlistPrompt] = useState(false)
@@ -49,9 +56,40 @@ export function AppointmentBooking({
   const [waitlistSuccess, setWaitlistSuccess] = useState<string | null>(null)
   const [isJoiningWaitlist, setIsJoiningWaitlist] = useState(false)
 
+  // Poll waitlist dynamically
+  useEffect(() => {
+    if (!showWaitlistPrompt || !conflictSlot) return
+
+    const intervalId = setInterval(async () => {
+      try {
+        const wlRes = await fetch(`/api/appointments/waitlist?doctorId=${doctorId}&doctorName=${encodeURIComponent(doctorName)}&date=${selectedDate}&time=${conflictSlot}`)
+        if (wlRes.ok) {
+          const wlData = await wlRes.json()
+          setWaitlistInfo(wlData)
+        }
+      } catch (err) {
+        console.error('Failed to poll waitlist', err)
+      }
+    }, 3000)
+
+    return () => clearInterval(intervalId)
+  }, [showWaitlistPrompt, conflictSlot, doctorId, doctorName, selectedDate])
+
+  // Sync patient data into formData if it loads after mount
+  useEffect(() => {
+    setFormData(prev => ({
+      patientName: patient?.name || prev.patientName,
+      patientPhone: patient?.phone || prev.patientPhone,
+      patientEmail: patient?.email || prev.patientEmail || initialEmail || ''
+    }))
+  }, [patient, initialEmail])
+
   // On mount: always re-fetch real slots for the initial date so booked slots show immediately
   useEffect(() => {
-    if (!date) return
+    if (!date) {
+      setIsFetchingSlots(false)
+      return
+    }
     setIsFetchingSlots(true)
     fetch(`/api/appointments?doctorId=${encodeURIComponent(doctorId)}&doctorName=${encodeURIComponent(doctorName)}&date=${date}`)
       .then(r => r.json())
@@ -102,6 +140,17 @@ export function AppointmentBooking({
     setIsSubmitting(true)
     setError(null)
 
+    const pName = patient?.name || formData.patientName
+    const pPhone = patient?.phone || formData.patientPhone
+    const pEmail = patient?.email || formData.patientEmail
+    const pUid = patient?.uid
+
+    if (!pName || (!pPhone && !pEmail && !pUid)) {
+      setError('Please provide your name and at least one contact method (email or phone).')
+      setIsSubmitting(false)
+      return
+    }
+
     // Convert "9:00 AM" → "09:00" for the backend
     const timeParts = selectedSlot.match(/(\d+):(\d+)\s*(AM|PM)/i)
     let formattedTime = selectedSlot
@@ -115,17 +164,31 @@ export function AppointmentBooking({
     }
 
     try {
-      const response = await fetch('/api/appointments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
+      if (paymentMethod === 'now') {
+        setIsProcessingPayment(true)
+        // Simulate payment gateway delay
+        await new Promise(r => setTimeout(r, 1500))
+        setIsProcessingPayment(false)
+      }
+
+      const payload = {
+          patientName: patient?.name || formData.patientName,
+          patientPhone: patient?.phone || formData.patientPhone,
+          patientEmail: patient?.email || formData.patientEmail,
+          patientUid: patient?.uid,
           doctorId,
           doctorName,
           date: selectedDate,
           time: formattedTime,
-          service: 'General Consultation'
-        })
+          service: 'General Consultation',
+          paymentStatus: paymentMethod === 'now' ? 'paid' : 'unpaid',
+          amount: consultationFee
+        }
+
+      const response = await fetch('/api/appointments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       })
 
       const data = await response.json()
@@ -157,6 +220,15 @@ export function AppointmentBooking({
   // When user clicks a booked slot badge directly — skip form submit, go straight to waitlist
   const handleClickBookedSlot = async (displaySlot: string) => {
     setError(null)
+    
+    // Validate: need at least a name and either phone or uid
+    const name = patient?.name || formData.patientName
+    const phone = patient?.phone || formData.patientPhone
+    if (!name || (!phone && !patient?.uid)) {
+      setError('Please enter your Name and Phone Number below before joining a waitlist.')
+      return
+    }
+
     // Convert display time e.g. "11:00 AM" to HH:mm
     const tp = displaySlot.match(/(\d+):(\d+)\s*(AM|PM)/i)
     let hhmm = displaySlot
@@ -177,8 +249,13 @@ export function AppointmentBooking({
 
   const handleJoinWaitlist = async () => {
     if (!conflictSlot) return
-    if (!formData.patientName || !formData.patientPhone || !formData.patientEmail) {
-      setError('Please fill in all fields before joining the waiting list.')
+    const name = patient?.name || formData.patientName
+    const phone = patient?.phone || formData.patientPhone
+    const email = patient?.email || formData.patientEmail
+    const uid = patient?.uid
+    
+    if (!name || (!phone && !email && !uid)) {
+      setError('Please provide your name and at least one contact method (email or phone).')
       setShowWaitlistPrompt(false)
       return
     }
@@ -193,7 +270,10 @@ export function AppointmentBooking({
           doctorName,
           date: selectedDate,
           time: conflictSlot,
-          ...formData,
+          patientName: name,
+          patientPhone: phone,
+          patientEmail: patient?.email || formData.patientEmail,
+          patientUid: patient?.uid,
           service: 'General Consultation',
         }),
       })
@@ -220,7 +300,8 @@ export function AppointmentBooking({
   }
 
   return (
-    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 overflow-y-auto p-4">
+      <div className="min-h-full flex items-center justify-center">
 
       {/* Waitlist confirmation popup */}
       {showWaitlistPrompt && waitlistInfo && (
@@ -273,7 +354,7 @@ export function AppointmentBooking({
       )}
 
       {!showWaitlistPrompt && !waitlistSuccess && (
-        <Card className="w-full max-w-md">
+        <Card className="w-full max-w-md my-4 relative">
           <CardHeader className="relative">
             <Button
               type="button"
@@ -356,18 +437,21 @@ export function AppointmentBooking({
                   value={formData.patientName}
                   onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
                   placeholder="John Doe"
+                  readOnly={!!patient?.name}
+                  className={patient?.name ? 'bg-muted' : ''}
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="patientPhone">Phone Number *</Label>
+                <Label htmlFor="patientPhone">Phone Number</Label>
                 <Input
                   id="patientPhone"
                   type="tel"
-                  required
                   value={formData.patientPhone}
                   onChange={(e) => setFormData({ ...formData, patientPhone: e.target.value })}
                   placeholder="+1 (555) 000-0000"
+                  readOnly={!!patient?.phone}
+                  className={patient?.phone ? 'bg-muted' : ''}
                 />
               </div>
               
@@ -379,21 +463,67 @@ export function AppointmentBooking({
                   value={formData.patientEmail}
                   onChange={(e) => setFormData({ ...formData, patientEmail: e.target.value })}
                   placeholder="john@example.com"
+                  readOnly={!!patient?.email}
+                  className={patient?.email ? 'bg-muted' : ''}
                 />
               </div>
 
+              {/* Payment Selection */}
+              <div className="space-y-3 pt-4 border-t border-border">
+                <h4 className="font-medium text-sm">Payment Details</h4>
+                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <span className="text-sm font-medium">Consultation Fee</span>
+                  <span className="font-semibold tracking-tight">₹{consultationFee}</span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('now')}
+                    className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
+                      paymentMethod === 'now' 
+                        ? 'border-primary bg-primary/5 text-primary' 
+                        : 'border-transparent bg-muted hover:bg-muted/80 text-muted-foreground'
+                    }`}
+                  >
+                    <span className="font-medium text-sm">Pay Now</span>
+                    <span className="text-xs opacity-80 mt-1">Simulated Gateway</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('later')}
+                    className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
+                      paymentMethod === 'later' 
+                        ? 'border-primary bg-primary/5 text-primary' 
+                        : 'border-transparent bg-muted hover:bg-muted/80 text-muted-foreground'
+                    }`}
+                  >
+                    <span className="font-medium text-sm">Pay at Hospital</span>
+                    <span className="text-xs opacity-80 mt-1">Cash or Card</span>
+                  </button>
+                </div>
+              </div>
+
               <div className="flex gap-2 pt-2">
-                <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
+                <Button type="button" variant="outline" className="w-1/3" onClick={onClose}>
                   Cancel
                 </Button>
-                <Button type="submit" className="flex-1" disabled={isSubmitting || !selectedSlot}>
-                  {isSubmitting ? 'Booking...' : 'Confirm Booking'}
+                <Button type="submit" className="w-2/3" disabled={isSubmitting || !selectedSlot || isProcessingPayment}>
+                  {(isSubmitting || isProcessingPayment) ? (
+                    <span className="flex items-center gap-2">
+                      <div className="h-4 w-4 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin" />
+                      {isProcessingPayment ? 'Processing Payment...' : 'Booking...'}
+                    </span>
+                  ) : (
+                    `Confirm & ${paymentMethod === 'now' ? 'Pay ₹' + consultationFee : 'Book'}`
+                  )}
                 </Button>
               </div>
             </form>
           </CardContent>
         </Card>
       )}
+      </div>
     </div>
   )
 }

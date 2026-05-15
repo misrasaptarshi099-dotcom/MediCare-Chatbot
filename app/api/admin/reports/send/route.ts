@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { getLabReports, updateLabReport } from '@/lib/db'
+import { storage } from '@/lib/firestore'
 import nodemailer from 'nodemailer'
 
 const transporter = nodemailer.createTransport({
@@ -10,6 +11,11 @@ const transporter = nodemailer.createTransport({
     pass: process.env.EMAIL_PASS,
   },
 })
+
+const portalBaseUrl =
+  process.env.PATIENT_PORTAL_URL ||
+  process.env.NEXT_PUBLIC_APP_URL ||
+  'http://localhost:3000'
 
 export async function POST(request: Request) {
   try {
@@ -28,13 +34,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Report not found' }, { status: 404 })
     }
 
-    // 2. Fetch the file buffer from Storage URL so we can attach it
-    const fileResponse = await fetch(report.fileUrl)
-    if (!fileResponse.ok) {
-      throw new Error(`Failed to download report file from storage: ${fileResponse.statusText}`)
+    // 2. Read the file directly from Storage when path exists; fallback to URL for legacy records
+    let buffer: Buffer
+    if (report.storagePath) {
+      const bucket = storage.bucket()
+      const [fileBuffer] = await bucket.file(report.storagePath).download()
+      buffer = fileBuffer
+    } else {
+      const fileResponse = await fetch(report.fileUrl)
+      if (!fileResponse.ok) {
+        throw new Error(`Failed to download report file from storage: ${fileResponse.statusText}`)
+      }
+      const arrayBuffer = await fileResponse.arrayBuffer()
+      buffer = Buffer.from(arrayBuffer)
     }
-    const arrayBuffer = await fileResponse.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
 
     // 3. Build email content
     // Use an anti-clip preheader just like the reminder email
@@ -65,7 +78,7 @@ export async function POST(request: Request) {
             </div>
 
             <div style="text-align: center; margin-top: 30px;">
-              <a href="https://medi-care-chatbot.vercel.app/patient/login" style="background-color: #0f172a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+              <a href="${portalBaseUrl}/patient/login" style="background-color: #0f172a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
                 View in Patient Portal
               </a>
             </div>

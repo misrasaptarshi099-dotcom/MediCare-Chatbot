@@ -9,11 +9,26 @@ import {
   type WaitlistEntry,
 } from '@/lib/db'
 
+function normalizeToHHMM(value: string): string {
+  const trimmed = value.trim()
+  if (/^\d{2}:\d{2}$/.test(trimmed)) return trimmed
+
+  const timeParts = trimmed.match(/(\d+):(\d+)\s*(AM|PM)/i)
+  if (!timeParts) return trimmed
+
+  let hours = parseInt(timeParts[1], 10)
+  const minutes = timeParts[2]
+  const ampm = timeParts[3].toUpperCase()
+  if (ampm === 'PM' && hours < 12) hours += 12
+  if (ampm === 'AM' && hours === 12) hours = 0
+  return `${hours.toString().padStart(2, '0')}:${minutes}`
+}
+
 async function promoteFromWaitlist(doctorId: string, date: string, time: string) {
   try {
     const waitlist = await getWaitlist()
     const match = waitlist
-      .filter(e => e.doctorId === doctorId && e.date === date && e.time === time)
+      .filter(e => e.doctorId === doctorId && e.date === date && normalizeToHHMM(e.time) === normalizeToHHMM(time))
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())[0]
 
     if (!match) return
@@ -30,7 +45,7 @@ async function promoteFromWaitlist(doctorId: string, date: string, time: string)
       doctorId: match.doctorId,
       doctorName: match.doctorName,
       date: match.date,
-      time: match.time,
+      time: normalizeToHHMM(match.time),
       service: match.service,
       status: 'scheduled',
       createdAt: new Date().toISOString(),
@@ -73,8 +88,14 @@ export async function PATCH(request: Request) {
       }
 
       // Check the new slot is free
+      const normalizedNewTime = normalizeToHHMM(newTime)
       const conflict = appointments.find(
-        a => a.doctorId === apt.doctorId && a.date === newDate && a.time === newTime && a.status === 'scheduled' && a.id !== appointmentId
+        a =>
+          a.doctorId === apt.doctorId &&
+          a.date === newDate &&
+          normalizeToHHMM(a.time) === normalizedNewTime &&
+          a.status === 'scheduled' &&
+          a.id !== appointmentId
       )
       if (conflict) {
         return NextResponse.json({ error: 'The new slot is already booked. Please choose another.' }, { status: 409 })
@@ -84,15 +105,15 @@ export async function PATCH(request: Request) {
       const oldDate = apt.date
       const oldTime = apt.time
 
-      await updateAppointment(appointmentId, { date: newDate, time: newTime })
+      await updateAppointment(appointmentId, { date: newDate, time: normalizedNewTime })
 
       // Free the old slot → promote from waitlist
       await promoteFromWaitlist(oldDoctorId, oldDate, oldTime)
 
       return NextResponse.json({
         success: true,
-        message: `Rescheduled to ${newDate} at ${newTime}.`,
-        appointment: { ...apt, date: newDate, time: newTime },
+        message: `Rescheduled to ${newDate} at ${normalizedNewTime}.`,
+        appointment: { ...apt, date: newDate, time: normalizedNewTime },
       })
     }
 

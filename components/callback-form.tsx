@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { X } from 'lucide-react'
+import { usePatient } from '@/lib/patient-context'
 
 interface CallbackFormProps {
   onClose: () => void
@@ -16,10 +17,11 @@ interface CallbackFormProps {
 }
 
 export function CallbackForm({ onClose, onSuccess, initialEmail }: CallbackFormProps) {
+  const { patient } = usePatient()
   const [formData, setFormData] = useState({
-    patientName: '',
-    patientPhone: '',
-    patientEmail: initialEmail || '',
+    patientName: patient?.name || '',
+    patientPhone: patient?.phone || '',
+    patientEmail: patient?.email || initialEmail || '',
     querySummary: '',
     department: 'General'
   })
@@ -77,6 +79,8 @@ export function CallbackForm({ onClose, onSuccess, initialEmail }: CallbackFormP
                 value={formData.patientName}
                 onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
                 placeholder="John Doe"
+                readOnly={!!patient?.name}
+                className={patient?.name ? 'bg-muted' : ''}
               />
             </div>
             <div className="space-y-2">

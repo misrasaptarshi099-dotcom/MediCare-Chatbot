@@ -83,7 +83,19 @@ export async function PUT(request: Request) {
     }
 
     const oldStatus = apt.status
-    await updateAppointment(id, { status })
+    const updateData: Record<string, any> = { status }
+
+    // ── Payment status logic ──
+    // If admin marks "completed", assume patient paid upfront/offline → set paid
+    if (status === 'completed') {
+      updateData.paymentStatus = 'paid'
+    }
+    // If admin cancels and it was previously paid → initiate refund
+    if (status === 'cancelled' && apt.paymentStatus === 'paid') {
+      updateData.paymentStatus = 'refunded'
+    }
+
+    await updateAppointment(id, updateData)
 
     // ── KEY FIX: promote from waitlist whenever admin cancels a scheduled slot ──
     let promoted: WaitlistEntry | null = null

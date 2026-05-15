@@ -15,6 +15,8 @@ import { ChatInterface } from '@/components/chat-interface'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { auth } from '@/lib/firebase'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
+import { PatientProvider } from '@/lib/patient-context'
+import { AccountLinkDialog } from '@/components/account-link-dialog'
 
 // ── Spring config ─────────────────────────────────────────────────────────────
 const SPRING = { type: 'spring', stiffness: 320, damping: 28, mass: 0.8 } as const
@@ -113,7 +115,33 @@ function LoadingScreen() {
 }
 
 // ── Appointment card ─────────────────────────────────────────────────────────
-function AppointmentCard({ apt, index }: { apt: any; index: number }) {
+function AppointmentCard({ apt, index, onPaymentSuccess }: { apt: any; index: number; onPaymentSuccess?: () => void }) {
+  const [isPaying, setIsPaying] = useState(false)
+
+  const handlePayNow = async () => {
+    setIsPaying(true)
+    try {
+      const res = await fetch('/api/payments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appointmentId: apt.id, amount: apt.amount })
+      })
+      if (res.ok) {
+        onPaymentSuccess?.()
+      }
+    } catch {
+      console.error('Payment failed')
+    } finally {
+      setIsPaying(false)
+    }
+  }
+
+  const paymentColor = apt.paymentStatus === 'paid'
+    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+    : apt.paymentStatus === 'refunded'
+    ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300 border-orange-200 dark:border-orange-800'
+    : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800'
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16, scale: 0.97 }}
@@ -122,24 +150,50 @@ function AppointmentCard({ apt, index }: { apt: any; index: number }) {
       whileHover={{ y: -2, boxShadow: '0 8px 30px rgba(0,0,0,0.08)' }}
       className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-border/60 rounded-xl bg-card/70 gap-4 cursor-default"
     >
-      <div>
+      <div className="flex-1">
         <p className="font-semibold text-foreground">{apt.service}</p>
         <p className="text-sm text-muted-foreground mt-0.5">with {apt.doctorName}</p>
-        <div className="flex items-center gap-2 mt-2">
+        <div className="flex items-center gap-2 mt-2 flex-wrap">
           <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border border-border/60 bg-background text-foreground/70">
             <Calendar className="h-3 w-3" /> {apt.date}
           </span>
           <span className="text-xs px-2.5 py-1 rounded-full border border-border/60 bg-background text-foreground/70">
             {apt.time}
           </span>
+          {apt.amount != null && (
+            <span className="text-xs px-2.5 py-1 rounded-full border border-border/60 bg-background text-foreground/70 font-medium">
+              ₹{apt.amount}
+            </span>
+          )}
         </div>
       </div>
-      <Badge
-        variant={apt.status === 'scheduled' ? 'default' : apt.status === 'completed' ? 'secondary' : 'destructive'}
-        className="w-fit text-xs"
-      >
-        {apt.status.charAt(0).toUpperCase() + apt.status.slice(1)}
-      </Badge>
+      <div className="flex items-center gap-2 flex-wrap shrink-0">
+        <Badge
+          variant={apt.status === 'scheduled' ? 'default' : apt.status === 'completed' ? 'secondary' : 'destructive'}
+          className="w-fit text-xs"
+        >
+          {apt.status.charAt(0).toUpperCase() + apt.status.slice(1)}
+        </Badge>
+        <Badge className={`w-fit text-xs border ${paymentColor}`}>
+          {apt.paymentStatus === 'paid' ? '✓ Paid' : apt.paymentStatus === 'refunded' ? '↩ Refunded' : '⏳ Unpaid'}
+        </Badge>
+        {apt.paymentStatus === 'unpaid' && apt.status === 'scheduled' && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-xs h-7 px-3 border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+            onClick={handlePayNow}
+            disabled={isPaying}
+          >
+            {isPaying ? (
+              <span className="flex items-center gap-1">
+                <div className="h-3 w-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                Paying...
+              </span>
+            ) : 'Pay Now'}
+          </Button>
+        )}
+      </div>
     </motion.div>
   )
 }
@@ -178,7 +232,7 @@ function CallbackCard({ cb, index }: { cb: any; index: number }) {
 }
 
 // ── Report card ─────────────────────────────────────────────────────────────
-function ReportCard({ report, index }: { report: any; index: number }) {
+function ReportCard({ report, index, uid }: { report: any; index: number; uid: string }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 16, scale: 0.97 }}
@@ -212,7 +266,11 @@ function ReportCard({ report, index }: { report: any; index: number }) {
           {report.status === 'sent' || report.status === 'ready' ? '✓ Ready' : '⏳ Processing'}
         </Badge>
         <Button size="sm" variant="outline" className="gap-2" asChild>
-          <a href={report.fileUrl} target="_blank" rel="noopener noreferrer">
+          <a
+            href={`/api/reports/download?reportId=${encodeURIComponent(report.id)}&uid=${encodeURIComponent(uid)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             <Download className="h-3.5 w-3.5" /> Download PDF
           </a>
         </Button>
@@ -245,7 +303,8 @@ function EmptyState({ label }: { label: string }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function PatientDashboard() {
   const router = useRouter()
-  const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [userUid, setUserUid] = useState<string | null>(null)
+  const [patientProfile, setPatientProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [patientData, setPatientData] = useState<{ appointments: any[]; callbacks: any[]; chats: any[]; waitlist: any[]; reports: any[] }>({
     appointments: [],
@@ -259,61 +318,62 @@ export default function PatientDashboard() {
   // Refresh patient data whenever the user switches tabs
   const setActiveTab = (tab: 'chat' | 'appointments' | 'callbacks' | 'reports') => {
     setActiveTabRaw(tab)
-    if (userEmail) fetchPatientData(userEmail)
+    if (userUid) fetchPatientData(userUid)
   }
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser?.email) {
-        const email = firebaseUser.email
-        setUserEmail(email)
-        fetchPatientData(email)
-        setLoading(false)
-      } else {
-        const storedEmail = typeof window !== 'undefined' ? localStorage.getItem('patient-email') : null
-        if (storedEmail) {
-          setUserEmail(storedEmail)
-          fetchPatientData(storedEmail)
-          setLoading(false)
-        } else {
-          router.push('/patient/login')
-          setLoading(false)
-        }
-      }
-    })
-    return () => unsubscribe()
-  }, [router])
-
-  const fetchPatientData = async (email: string) => {
+  const fetchPatientData = async (uid: string) => {
     try {
-      const res = await fetch(`/api/patient/data?email=${encodeURIComponent(email)}`)
+      const res = await fetch(`/api/patient/data?uid=${encodeURIComponent(uid)}`)
       if (res.ok) {
         const data = await res.json()
-        setPatientData(data)
+        setPatientData({
+          appointments: data.appointments || [],
+          callbacks: data.callbacks || [],
+          chats: data.chats || [],
+          waitlist: data.waitlist || [],
+          reports: data.reports || [],
+        })
+        if (data.patient) {
+          setPatientProfile(data.patient)
+        }
       }
     } catch (err) {
       console.error('Failed to fetch patient records', err)
     }
   }
 
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser?.uid) {
+        const uid = firebaseUser.uid
+        setUserUid(uid)
+        await fetchPatientData(uid)
+        setLoading(false)
+      } else {
+        router.push('/patient/login')
+        setLoading(false)
+      }
+    })
+    return () => unsubscribe()
+  }, [router])
+
   const handleSignOut = async () => {
     await signOut(auth)
-    if (typeof window !== 'undefined') localStorage.removeItem('patient-email')
     router.push('/')
   }
 
   const TABS = [
     { key: 'chat',         label: 'AI Assistant',  icon: MessageSquare },
     { key: 'appointments', label: 'Appointments',  icon: Calendar },
-    { key: 'reports',      label: 'Lab Reports',   icon: FileText },
+    { key: 'reports',      label: 'Reports',       icon: FileText },
     { key: 'callbacks',    label: 'Callbacks',     icon: PhoneCall },
   ] as const
 
   return (
-    <>
+    <PatientProvider initialPatient={patientProfile}>
       <AnimatePresence>{loading && <LoadingScreen />}</AnimatePresence>
 
-      {!loading && userEmail && (
+      {!loading && userUid && patientProfile && (
         <motion.div
           className="h-screen flex flex-col bg-background overflow-hidden"
           initial={{ opacity: 0 }}
@@ -344,15 +404,30 @@ export default function PatientDashboard() {
               </Link>
 
               <div className="flex items-center gap-3">
-                {/* Email pill */}
+                {/* Profile Pill & Linking */}
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ ...SPRING, delay: 0.2 }}
-                  className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted border border-border/60 text-xs text-muted-foreground"
+                  className="hidden md:flex items-center gap-2"
                 >
-                  <User className="h-3 w-3" />
-                  {userEmail}
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted border border-border/60 text-xs text-muted-foreground mr-2">
+                    <User className="h-3 w-3" />
+                    <span className="font-medium">{patientProfile?.name}</span>
+                  </div>
+                  
+                  {!patientProfile?.authProviders?.includes('phone') && (
+                    <AccountLinkDialog 
+                      providerToLink="phone" 
+                      onSuccess={() => fetchPatientData(userUid)} 
+                    />
+                  )}
+                  {!patientProfile?.authProviders?.includes('email') && !patientProfile?.authProviders?.includes('google') && (
+                    <AccountLinkDialog 
+                      providerToLink="email" 
+                      onSuccess={() => fetchPatientData(userUid)} 
+                    />
+                  )}
                 </motion.div>
 
                 <ThemeToggle />
@@ -378,14 +453,14 @@ export default function PatientDashboard() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ ...SPRING, delay: 0.18 }}
-              className="shrink-0 max-w-md mx-auto w-full"
+              className="shrink-0 max-w-2xl mx-auto w-full"
             >
-              <div className="relative flex items-center bg-muted border border-border rounded-2xl p-1 gap-1">
+              <div className="relative flex items-center bg-muted border border-border rounded-2xl p-1 gap-1 overflow-x-auto no-scrollbar">
                 {TABS.map(({ key, label, icon: Icon }) => (
                   <button
                     key={key}
                     onClick={() => setActiveTab(key)}
-                    className="relative flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-sm font-medium z-10 transition-colors"
+                    className="relative flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-sm font-medium z-10 transition-colors min-w-0"
                   >
                     {activeTab === key && (
                       <motion.div
@@ -405,7 +480,7 @@ export default function PatientDashboard() {
                       transition={SPRING}
                     >
                       <Icon className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline-block">{label}</span>
+                      <span className="hidden sm:inline-block whitespace-nowrap text-xs md:text-sm">{label}</span>
                     </motion.div>
                   </button>
                 ))}
@@ -424,7 +499,7 @@ export default function PatientDashboard() {
                   zIndex: activeTab === 'chat' ? 10 : 0,
                 }}
               >
-                <ChatInterface initialEmail={userEmail} initialMessages={patientData.chats} />
+                <ChatInterface initialMessages={patientData.chats} />
               </div>
 
               <AnimatePresence mode="wait">
@@ -454,7 +529,7 @@ export default function PatientDashboard() {
                             <EmptyState label="No appointments found." />
                           ) : (
                             patientData.appointments.map((apt, i) => (
-                              <AppointmentCard key={apt.id} apt={apt} index={i} />
+                              <AppointmentCard key={apt.id} apt={apt} index={i} onPaymentSuccess={() => userUid && fetchPatientData(userUid)} />
                             ))
                           )}
                         </div>
@@ -555,7 +630,7 @@ export default function PatientDashboard() {
                         <EmptyState label="No reports available yet." />
                       ) : (
                         patientData.reports.map((report, i) => (
-                          <ReportCard key={report.id} report={report} index={i} />
+                          <ReportCard key={report.id} report={report} index={i} uid={userUid || ''} />
                         ))
                       )}
                     </div>
@@ -567,6 +642,6 @@ export default function PatientDashboard() {
           </main>
         </motion.div>
       )}
-    </>
+    </PatientProvider>
   )
 }

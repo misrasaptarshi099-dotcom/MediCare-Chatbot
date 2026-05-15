@@ -1,8 +1,2 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron/appointment-reminders",
-      "schedule": "30 12 * * *"
-    }
-  ]
 }

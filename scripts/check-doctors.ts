@@ -1,10 +1,29 @@
-import { config } from 'dotenv';
-config({ path: '.env.local' });
+import { initializeApp, cert, getApps } from 'firebase-admin/app'
+import { getFirestore } from 'firebase-admin/firestore'
+import * as dotenv from 'dotenv'
 
-async function main() {
-  const { db } = await import('../lib/firestore');
-  const snap = await db.collection('doctors').get();
-  console.log(`Found ${snap.size} doctors in Firestore!`);
-  process.exit(0);
+dotenv.config({ path: '.env.local' })
+
+const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
+const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
+const privateKey = (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n')
+
+if (!getApps().length) {
+  initializeApp({
+    credential: cert({
+      projectId,
+      clientEmail,
+      privateKey,
+    })
+  })
 }
-main().catch(console.error);
+
+const db = getFirestore()
+
+async function checkDoctors() {
+  const snap = await db.collection('doctors').get()
+  const list = snap.docs.map(d => ({id: d.id, name: d.data().name, availability: d.data().availability}))
+  console.log(JSON.stringify(list, null, 2))
+}
+
+checkDoctors().then(() => process.exit(0))
