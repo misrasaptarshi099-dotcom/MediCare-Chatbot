@@ -95,8 +95,31 @@ export function AppointmentBooking({
       .then(r => r.json())
       .then(data => {
         if (data.availableSlots !== undefined) {
-          setCurrentSlots(data.availableSlots || [])
-          setCurrentBookedSlots(data.bookedSlots || [])
+          const now = new Date()
+          const [year, month, day] = date.split('-').map(Number)
+          const filterFuture = (slots: string[]) => slots.filter((slotStr: string) => {
+            let h: number, m: number;
+            const matchAMPM = slotStr.match(/(\d+):(\d+)\s*(AM|PM)/i)
+            if (matchAMPM) {
+              h = parseInt(matchAMPM[1], 10)
+              m = parseInt(matchAMPM[2], 10)
+              const ampm = matchAMPM[3].toUpperCase()
+              if (ampm === 'PM' && h < 12) h += 12
+              if (ampm === 'AM' && h === 12) h = 0
+            } else {
+              const match24 = slotStr.match(/(\d{1,2}):(\d{2})/)
+              if (match24) {
+                h = parseInt(match24[1], 10)
+                m = parseInt(match24[2], 10)
+              } else {
+                return true
+              }
+            }
+            return new Date(year, month - 1, day, h, m) > now
+          })
+          
+          setCurrentSlots(filterFuture(data.availableSlots || []))
+          setCurrentBookedSlots(filterFuture(data.bookedSlots || []))
         }
       })
       .catch(() => {})
@@ -116,8 +139,31 @@ export function AppointmentBooking({
       const data = await response.json()
       
       if (response.ok) {
-        setCurrentSlots(data.availableSlots || [])
-        setCurrentBookedSlots(data.bookedSlots || [])
+        const now = new Date()
+        const [year, month, day] = newDate.split('-').map(Number)
+        const filterFuture = (slots: string[]) => slots.filter((slotStr: string) => {
+          let h: number, m: number;
+          const matchAMPM = slotStr.match(/(\d+):(\d+)\s*(AM|PM)/i)
+          if (matchAMPM) {
+            h = parseInt(matchAMPM[1], 10)
+            m = parseInt(matchAMPM[2], 10)
+            const ampm = matchAMPM[3].toUpperCase()
+            if (ampm === 'PM' && h < 12) h += 12
+            if (ampm === 'AM' && h === 12) h = 0
+          } else {
+            const match24 = slotStr.match(/(\d{1,2}):(\d{2})/)
+            if (match24) {
+              h = parseInt(match24[1], 10)
+              m = parseInt(match24[2], 10)
+            } else {
+              return true
+            }
+          }
+          return new Date(year, month - 1, day, h, m) > now
+        })
+
+        setCurrentSlots(filterFuture(data.availableSlots || []))
+        setCurrentBookedSlots(filterFuture(data.bookedSlots || []))
       } else {
         setError(data.error || 'Failed to fetch slots for this date')
         setCurrentSlots([])

@@ -120,7 +120,32 @@ export function DiagnosticBooking({
       .then(r => r.json())
       .then(data => {
         if (data.availableSlots !== undefined) {
-          setCurrentSlots(data.availableSlots || [])
+          const now = new Date()
+          const [year, month, day] = selectedDate.split('-').map(Number)
+          
+          const filteredSlots = (data.availableSlots || []).filter((slotStr: string) => {
+            let h: number, m: number;
+            const matchAMPM = slotStr.match(/(\d+):(\d+)\s*(AM|PM)/i)
+            if (matchAMPM) {
+              h = parseInt(matchAMPM[1], 10)
+              m = parseInt(matchAMPM[2], 10)
+              const ampm = matchAMPM[3].toUpperCase()
+              if (ampm === 'PM' && h < 12) h += 12
+              if (ampm === 'AM' && h === 12) h = 0
+            } else {
+              const match24 = slotStr.match(/(\d{1,2}):(\d{2})/)
+              if (match24) {
+                h = parseInt(match24[1], 10)
+                m = parseInt(match24[2], 10)
+              } else {
+                return true
+              }
+            }
+          
+            const slotDate = new Date(year, month - 1, day, h, m)
+            return slotDate > now
+          })
+          setCurrentSlots(filteredSlots)
         } else {
           setError(data.error || 'Failed to fetch slots for this date')
           setCurrentSlots([])

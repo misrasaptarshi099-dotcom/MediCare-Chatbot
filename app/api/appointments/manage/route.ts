@@ -76,7 +76,11 @@ export async function PATCH(request: Request) {
     }
 
     if (action === 'cancel') {
-      await updateAppointment(appointmentId, { status: 'cancelled' })
+      const updateData: Partial<Appointment> = { status: 'cancelled' }
+      if (apt.paymentStatus === 'paid') {
+        updateData.paymentStatus = 'refunded'
+      }
+      await updateAppointment(appointmentId, updateData)
       // Promote next person on waitlist for the freed slot
       await promoteFromWaitlist(apt.doctorId, apt.date, apt.time)
       return NextResponse.json({ success: true, message: 'Appointment cancelled successfully.' })
