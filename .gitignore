@@ -12,3 +12,16 @@ node_modules/
 # Data and logs
 /database/
 /logs/
+
+# Agent and IDE files
+.agents/
+.cursor/
+skills-lock.json
+/scripts/
+
+# CodeRabbit and Debug Outputs
+coderabbit*
+*_errors*.txt
+test_*.mjs
+parse_review.js
+test_output.txt
