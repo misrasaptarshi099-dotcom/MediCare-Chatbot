@@ -31,7 +31,8 @@ service cloud.firestore {
     
     match /appointments/{document} {
       allow read: if request.auth != null && request.auth.uid == resource.data.patientUid;
-      allow write: if request.auth != null && request.auth.uid == request.resource.data.patientUid;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.patientUid;
+      allow update: if request.auth != null && request.auth.uid == resource.data.patientUid && request.resource.data.patientUid == resource.data.patientUid;
     }
 
     match /labReports/{document} {
@@ -50,7 +51,8 @@ service cloud.firestore {
 
     match /waitlist/{document} {
       allow read: if request.auth != null && request.auth.uid == resource.data.patientUid;
-      allow write: if request.auth != null && request.auth.uid == request.resource.data.patientUid;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.patientUid;
+      allow update: if request.auth != null && request.auth.uid == resource.data.patientUid && request.resource.data.patientUid == resource.data.patientUid;
     }
 
     // Strictly server-side or admin SDK only

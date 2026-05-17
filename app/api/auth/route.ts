@@ -55,10 +55,8 @@ export async function GET() {
   try {
     const cookieStore = await cookies()
     const session = cookieStore.get('session')
-    console.log('API /auth GET - session cookie:', session?.value)
 
     const user = await requireAdminSession()
-    console.log('API /auth GET - user from requireAdminSession:', user?.id)
 
     if (!user) {
       return NextResponse.json({ authenticated: false })

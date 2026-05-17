@@ -292,6 +292,12 @@ export async function POST(request: Request) {
        return NextResponse.json({ error: 'Unauthorized: missing token' }, { status: 401 })
     }
 
+    if (userUid && body.uid && userUid !== body.uid) {
+      return NextResponse.json({ error: 'Unauthorized: uid mismatch' }, { status: 401 })
+    }
+
+    const effectiveUid = userUid || body.uid
+
     if (!query?.trim()) {
       return NextResponse.json({ error: 'Query is required' }, { status: 400 })
     }
@@ -311,16 +317,16 @@ export async function POST(request: Request) {
       const responseMessage = `Here's a full breakdown of insurance coverage for each department at MediCare. Each card shows which insurers cover that department's services and at what percentage.`
 
       // Persist chat history
-      if (body.uid) {
+      if (effectiveUid) {
         try {
-          const existing = await getChatSession(body.uid)
+          const existing = await getChatSession(effectiveUid)
           const existingMessages = existing?.messages ?? []
           const timestamp = Date.now()
           existingMessages.push(
             { id: `u-${timestamp}`, type: 'user', content: query, timestamp },
             { id: `a-${timestamp}`, type: 'assistant', content: responseMessage, timestamp }
           )
-          await saveChatSession(body.uid, existingMessages, new Date().toISOString())
+          await saveChatSession(effectiveUid, existingMessages, new Date().toISOString())
         } catch {}
       }
 
@@ -342,11 +348,11 @@ export async function POST(request: Request) {
 
     // --- Fetch patient's own appointments if uid is provided ---
     let patientAppointmentsContext = ''
-    if (body.uid) {
+    if (effectiveUid) {
       try {
         const appointments = await getAllAppointments()
         const patientApts = appointments.filter(
-          a => (a.patientUid === body.uid || (body.email && a.patientEmail?.toLowerCase() === body.email?.toLowerCase())) && a.status === 'scheduled'
+          a => (a.patientUid === effectiveUid || (body.email && a.patientEmail?.toLowerCase() === body.email?.toLowerCase())) && a.status === 'scheduled'
         )
         if (patientApts.length > 0) {
           const lines = patientApts.map(a =>
@@ -387,9 +393,9 @@ export async function POST(request: Request) {
     }
 
     // Persist chat history if a UID is provided
-    if (body.uid) {
+    if (effectiveUid) {
       try {
-        const existing = await getChatSession(body.uid)
+        const existing = await getChatSession(effectiveUid)
         const existingMessages = existing?.messages ?? []
 
         const timestamp = Date.now()
@@ -397,7 +403,7 @@ export async function POST(request: Request) {
         const aiMsg: DbChatMessage = { id: `a-${timestamp}`, type: 'assistant', content: parsed.message, timestamp }
 
         existingMessages.push(userMsg, aiMsg)
-        await saveChatSession(body.uid, existingMessages, new Date().toISOString())
+        await saveChatSession(effectiveUid, existingMessages, new Date().toISOString())
       } catch (err) {
         console.error('Failed to save chat history:', err)
       }

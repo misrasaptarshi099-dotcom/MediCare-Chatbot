@@ -1,10 +1,23 @@
 import { NextResponse } from 'next/server'
 import { getDoctors, addDoctor, updateDoctor, type Doctor } from '@/lib/db'
+import crypto from 'crypto'
 
 export async function POST(request: Request) {
   try {
     const webhookSecret = request.headers.get('x-webhook-secret')
-    if (webhookSecret !== process.env.DOCTOR_UPDATE_WEBHOOK_SECRET) {
+    const expectedSecret = process.env.DOCTOR_UPDATE_WEBHOOK_SECRET
+    
+    if (!webhookSecret || !expectedSecret) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    try {
+      const a = Buffer.from(webhookSecret)
+      const b = Buffer.from(expectedSecret)
+      if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+    } catch (e) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

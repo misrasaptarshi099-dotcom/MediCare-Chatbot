@@ -37,7 +37,10 @@ export async function POST(request: Request) {
     }
 
     const aptData = doc.data()
-    if (aptData?.patientUid !== uid) {
+    if (!aptData) {
+      return NextResponse.json({ error: 'Appointment data not found' }, { status: 404 })
+    }
+    if (aptData.patientUid !== uid) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
