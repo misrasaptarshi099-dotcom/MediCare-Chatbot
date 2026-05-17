@@ -1,3 +1,4 @@
+import { requireAdminSession } from '@/lib/admin-auth'
 import { NextResponse } from 'next/server'
 import {
   getAllPatients,
@@ -11,6 +12,9 @@ import { adminAuth } from '@/lib/firebase-admin'
 
 // GET — list all unique patients from the patients collection
 export async function GET() {
+  const adminUser = await requireAdminSession();
+  if (!adminUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const patients = await getAllPatients()
     const patientMap: Record<string, any> = {}
@@ -63,8 +67,8 @@ export async function GET() {
       const sessions = await getAllChatSessions()
       // Chat session IDs are usually the user UID
       for (const s of sessions) {
-         if (s.id && patientMap[s.id]) {
-           patientMap[s.id].chatCount = s.messages?.length || 0
+         if (s.uid && patientMap[s.uid]) {
+           patientMap[s.uid].chatCount = s.messages?.length || 0
          }
       }
     } catch {}
@@ -78,6 +82,9 @@ export async function GET() {
 
 // DELETE — remove a patient's appointments, waitlist, chats, and/or callback tickets
 export async function DELETE(request: Request) {
+  const adminUser = await requireAdminSession();
+  if (!adminUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   const { uid, deleteAppointments, deleteChats, deleteCallbacks } = await request.json()
 
   if (!uid) {
@@ -166,6 +173,9 @@ export async function DELETE(request: Request) {
 
 // POST — create a new patient from the admin dashboard
 export async function POST(request: Request) {
+  const adminUser = await requireAdminSession();
+  if (!adminUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const { name, contactType, contactValue } = await request.json()
 

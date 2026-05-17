@@ -1,0 +1,75 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Publicly readable configuration and catalog data
+    match /doctors/{document} {
+      allow read: if true;
+      allow write: if false; // Admin SDK only
+    }
+    match /departments/{document} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /services/{document} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /insurancePartners/{document} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /config/{document} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Patient protected data
+    match /patients/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+    
+    match /appointments/{document} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.patientUid;
+      allow write: if request.auth != null && request.auth.uid == request.resource.data.patientUid;
+    }
+
+    match /labReports/{document} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.patientUid;
+      allow write: if false; // Uploaded via Admin SDK
+    }
+
+    match /callbacks/{document} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.patientUid;
+      allow write: if request.auth != null && request.auth.uid == request.resource.data.patientUid;
+    }
+
+    match /chatSessions/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    match /waitlist/{document} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.patientUid;
+      allow write: if request.auth != null && request.auth.uid == request.resource.data.patientUid;
+    }
+
+    // Strictly server-side or admin SDK only
+    match /otps/{document} {
+      allow read, write: if false;
+    }
+    match /adminUsers/{document} {
+      allow read, write: if false;
+    }
+    match /sentReminders/{document} {
+      allow read, write: if false;
+    }
+    match /unansweredQueries/{document} {
+      allow read, write: if false;
+    }
+    
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

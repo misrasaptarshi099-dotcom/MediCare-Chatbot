@@ -8,7 +8,28 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: 'MediCare Hospital - AI Assistant',
-  description: 'AI-powered hospital information assistant for patients and staff',
+  description: 'AI-powered hospital information assistant for patients and staff to book appointments, check diagnostics, and get medical support.',
+  keywords: ['hospital', 'healthcare', 'medical appointments', 'diagnostic tests', 'AI assistant', 'MediCare'],
+  authors: [{ name: 'MediCare Hospital' }],
+  creator: 'MediCare Hospital',
+  publisher: 'MediCare Hospital',
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  openGraph: {
+    title: 'MediCare Hospital - AI Assistant',
+    description: 'AI-powered hospital information assistant for patients and staff. Manage appointments, lab reports, and more.',
+    url: 'https://medicare-chatbot.vercel.app',
+    siteName: 'MediCare Hospital',
+    locale: 'en_US',
+    type: 'website',
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
   icons: {
     icon: '/favicon.svg',
   },

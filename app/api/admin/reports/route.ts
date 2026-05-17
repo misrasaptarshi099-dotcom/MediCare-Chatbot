@@ -1,3 +1,4 @@
+import { requireAdminSession } from '@/lib/admin-auth'
 export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { v4 as uuidv4 } from 'uuid'
@@ -26,6 +27,9 @@ function extractStoragePathFromUrl(fileUrl: string, bucketName: string): string 
 }
 
 export async function GET() {
+  const adminUser = await requireAdminSession();
+  if (!adminUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const reports = await getLabReports()
     
@@ -46,6 +50,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const adminUser = await requireAdminSession();
+  if (!adminUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const formData = await request.formData()
     
@@ -142,6 +149,9 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  const adminUser = await requireAdminSession();
+  if (!adminUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const body = await request.json()
     const { id, ...updates } = body
@@ -159,6 +169,9 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const adminUser = await requireAdminSession();
+  if (!adminUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')

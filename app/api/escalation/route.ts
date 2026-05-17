@@ -1,3 +1,4 @@
+import { requireAdminSession } from '@/lib/admin-auth'
 import { NextResponse } from 'next/server'
 import {
   getUnansweredQueries,
@@ -11,6 +12,9 @@ import {
 } from '@/lib/db'
 
 export async function POST(request: Request) {
+  const adminUser = await requireAdminSession();
+  if (!adminUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const body = await request.json()
     const { action, ...data } = body
@@ -69,6 +73,9 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
+  const adminUser = await requireAdminSession();
+  if (!adminUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   const { searchParams } = new URL(request.url)
   const type = searchParams.get('type')
 
@@ -95,6 +102,9 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  const adminUser = await requireAdminSession();
+  if (!adminUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const body = await request.json()
     const { ticketId, status } = body

@@ -70,9 +70,24 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Appointment not found' }, { status: 404 })
     }
 
-    // Security: only allow the patient who owns it (if email provided)
-    if (patientEmail && apt.patientEmail?.toLowerCase() !== patientEmail.toLowerCase()) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    // Validate Firebase ID token
+    const authHeader = request.headers.get('Authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const token = authHeader.split('Bearer ')[1]
+    let decodedToken;
+    try {
+      const { adminAuth } = await import('@/lib/firebase-admin')
+      decodedToken = await adminAuth.verifyIdToken(token)
+    } catch (e) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+    }
+    const uid = decodedToken.uid
+
+    // Security: only allow the patient who owns it
+    if (apt.patientUid !== uid) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     if (action === 'cancel') {

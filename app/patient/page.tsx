@@ -43,13 +43,13 @@ function PortalMesh() {
         }}
       />
       <motion.div
-        className="absolute -top-32 -left-32 w-[500px] h-[500px] rounded-full opacity-[0.05] dark:opacity-[0.04]"
+        className="absolute -top-32 -left-32 w-[min(500px,100vw)] h-[min(500px,100vw)] rounded-full opacity-[0.05] dark:opacity-[0.04]"
         style={{ background: 'radial-gradient(circle, #6366f1 0%, #3b82f6 50%, transparent 70%)', filter: 'blur(70px)' }}
         animate={{ scale: [1, 1.08, 1], x: [0, 20, 0] }}
         transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut' }}
       />
       <motion.div
-        className="absolute bottom-0 right-0 w-[400px] h-[400px] rounded-full opacity-[0.04] dark:opacity-[0.03]"
+        className="absolute bottom-0 right-0 w-[min(400px,100vw)] h-[min(400px,100vw)] rounded-full opacity-[0.04] dark:opacity-[0.03]"
         style={{ background: 'radial-gradient(circle, #8b5cf6 0%, #06b6d4 50%, transparent 70%)', filter: 'blur(60px)' }}
         animate={{ scale: [1, 1.1, 1], y: [0, -20, 0] }}
         transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut', delay: 4 }}

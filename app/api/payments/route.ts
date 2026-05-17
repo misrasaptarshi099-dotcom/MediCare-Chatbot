@@ -1,9 +1,22 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/firestore'
-import { getAppointments } from '@/lib/db'
+import { adminAuth } from '@/lib/firebase-admin'
 
 export async function POST(request: Request) {
   try {
+    const authHeader = request.headers.get('Authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const token = authHeader.split('Bearer ')[1]
+    let decodedToken;
+    try {
+      decodedToken = await adminAuth.verifyIdToken(token)
+    } catch (e) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+    }
+    const uid = decodedToken.uid
+
     const { appointmentId, amount, method } = await request.json()
 
     if (!appointmentId) {
@@ -21,6 +34,11 @@ export async function POST(request: Request) {
 
     if (!doc.exists) {
       return NextResponse.json({ error: 'Appointment not found' }, { status: 404 })
+    }
+
+    const aptData = doc.data()
+    if (aptData?.patientUid !== uid) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Update payment status

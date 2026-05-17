@@ -46,7 +46,7 @@ function CursorGlow() {
       aria-hidden
     >
       <motion.div
-        className="absolute w-[500px] h-[500px] rounded-full"
+        className="absolute w-[min(500px,100vw)] h-[min(500px,100vw)] rounded-full"
         style={{
           left: springX,
           top: springY,
@@ -74,19 +74,19 @@ function MeshBackground() {
       />
       {/* Gradient blobs */}
       <motion.div
-        className="absolute -top-40 -left-40 w-[800px] h-[800px] rounded-full opacity-[0.06] dark:opacity-[0.04]"
+        className="absolute -top-40 -left-40 w-[min(800px,100vw)] h-[min(800px,100vw)] rounded-full opacity-[0.06] dark:opacity-[0.04]"
         style={{ background: 'radial-gradient(circle, #6366f1 0%, #3b82f6 50%, transparent 70%)', filter: 'blur(80px)' }}
         animate={{ scale: [1, 1.08, 1], x: [0, 30, 0], y: [0, 20, 0] }}
         transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
       />
       <motion.div
-        className="absolute top-1/2 -right-40 w-[600px] h-[600px] rounded-full opacity-[0.05] dark:opacity-[0.03]"
+        className="absolute top-1/2 -right-40 w-[min(600px,100vw)] h-[min(600px,100vw)] rounded-full opacity-[0.05] dark:opacity-[0.03]"
         style={{ background: 'radial-gradient(circle, #8b5cf6 0%, #06b6d4 50%, transparent 70%)', filter: 'blur(70px)' }}
         animate={{ scale: [1, 1.06, 1], x: [0, -20, 0], y: [0, -30, 0] }}
         transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut', delay: 3 }}
       />
       <motion.div
-        className="absolute bottom-0 left-1/3 w-[500px] h-[500px] rounded-full opacity-[0.04] dark:opacity-[0.03]"
+        className="absolute bottom-0 left-1/3 w-[min(500px,100vw)] h-[min(500px,100vw)] rounded-full opacity-[0.04] dark:opacity-[0.03]"
         style={{ background: 'radial-gradient(circle, #10b981 0%, #3b82f6 50%, transparent 70%)', filter: 'blur(70px)' }}
         animate={{ scale: [1, 1.1, 1], x: [0, 15, 0] }}
         transition={{ duration: 20, repeat: Infinity, ease: 'easeInOut', delay: 6 }}

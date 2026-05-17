@@ -22,7 +22,7 @@ async function getAllPatientEmails(): Promise<Set<string>> {
   } catch {}
   try {
     const sessions = await getAllChatSessions()
-    sessions.forEach(s => s.email && emails.add(s.email.toLowerCase().trim()))
+    /* chat sessions do not store email directly anymore */
   } catch {}
   try {
     const tickets = await getCallbackTickets()

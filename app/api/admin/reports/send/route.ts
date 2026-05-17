@@ -1,3 +1,4 @@
+import { requireAdminSession } from '@/lib/admin-auth'
 export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { getLabReports, updateLabReport } from '@/lib/db'
@@ -18,6 +19,9 @@ const portalBaseUrl =
   'http://localhost:3000'
 
 export async function POST(request: Request) {
+  const adminUser = await requireAdminSession();
+  if (!adminUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const body = await request.json()
     const { reportId } = body

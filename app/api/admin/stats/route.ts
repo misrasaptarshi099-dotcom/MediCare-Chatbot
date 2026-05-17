@@ -1,8 +1,12 @@
+import { requireAdminSession } from '@/lib/admin-auth'
 export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { getAllAppointments, type Appointment } from '@/lib/db'
 
 export async function GET() {
+  const adminUser = await requireAdminSession();
+  if (!adminUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const appointments = await getAllAppointments()
     

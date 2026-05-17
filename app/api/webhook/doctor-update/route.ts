@@ -3,6 +3,11 @@ import { getDoctors, addDoctor, updateDoctor, type Doctor } from '@/lib/db'
 
 export async function POST(request: Request) {
   try {
+    const webhookSecret = request.headers.get('x-webhook-secret')
+    if (webhookSecret !== process.env.DOCTOR_UPDATE_WEBHOOK_SECRET) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await request.json()
     const { action, doctor } = body
 

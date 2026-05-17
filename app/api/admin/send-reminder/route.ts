@@ -1,3 +1,4 @@
+import { requireAdminSession } from '@/lib/admin-auth'
 import { NextResponse } from 'next/server'
 import { getAllAppointments, type Appointment } from '@/lib/db'
 import { sendAppointmentReminder } from '@/lib/reminder-email'
@@ -6,6 +7,9 @@ import { sendAppointmentReminder } from '@/lib/reminder-email'
 // Body: { appointmentId: string }  — send to one appointment
 // Body: { date: string }           — send to all appointments on a given date
 export async function POST(request: Request) {
+  const adminUser = await requireAdminSession();
+  if (!adminUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   const body = await request.json()
   const { appointmentId, date } = body
 

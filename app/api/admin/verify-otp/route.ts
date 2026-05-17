@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getOtp, deleteOtp, getAdminUsers, type User } from '@/lib/db'
 import { cookies } from 'next/headers'
+import { createAdminSession } from '@/lib/admin-auth'
 
 export async function POST(request: Request) {
   const { email, code } = await request.json()
@@ -34,8 +35,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Admin user not found.' }, { status: 404 })
   }
 
-  // Create session cookie (same as before)
-  const sessionToken = Buffer.from(`${adminUser.id}:${Date.now()}`).toString('base64')
+  // Create secure session token
+  const sessionToken = await createAdminSession(adminUser.id)
   const cookieStore = await cookies()
   cookieStore.set('session', sessionToken, {
     httpOnly: true,

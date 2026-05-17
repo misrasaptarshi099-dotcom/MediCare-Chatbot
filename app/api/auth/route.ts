@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getAdminUsers, type User } from '@/lib/db'
 import { cookies } from 'next/headers'
+import bcrypt from 'bcryptjs'
+import { createAdminSession, requireAdminSession, deleteAdminSession } from '@/lib/admin-auth'
 
 export async function POST(request: Request) {
   try {
@@ -11,14 +13,20 @@ export async function POST(request: Request) {
     }
 
     const users = await getAdminUsers()
-    const user = users.find(u => u.username === username && u.password === password)
+    const user = users.find(u => u.username === username)
 
     if (!user) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
-    // Create a simple session token
-    const sessionToken = Buffer.from(`${user.id}:${Date.now()}`).toString('base64')
+    // Verify password with bcrypt
+    const isValid = await bcrypt.compare(password, user.password)
+    if (!isValid) {
+      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
+    }
+
+    // Create secure session token
+    const sessionToken = await createAdminSession(user.id)
     
     const cookieStore = await cookies()
     cookieStore.set('session', sessionToken, {
@@ -47,17 +55,10 @@ export async function GET() {
   try {
     const cookieStore = await cookies()
     const session = cookieStore.get('session')
+    console.log('API /auth GET - session cookie:', session?.value)
 
-    if (!session) {
-      return NextResponse.json({ authenticated: false })
-    }
-
-    // Decode and validate session
-    const decoded = Buffer.from(session.value, 'base64').toString()
-    const [userId] = decoded.split(':')
-
-    const users = await getAdminUsers()
-    const user = users.find(u => u.id === userId)
+    const user = await requireAdminSession()
+    console.log('API /auth GET - user from requireAdminSession:', user?.id)
 
     if (!user) {
       return NextResponse.json({ authenticated: false })
@@ -81,6 +82,12 @@ export async function GET() {
 export async function DELETE() {
   try {
     const cookieStore = await cookies()
+    const session = cookieStore.get('session')
+    
+    if (session?.value) {
+      await deleteAdminSession(session.value)
+    }
+    
     cookieStore.delete('session')
     return NextResponse.json({ success: true })
   } catch (error) {

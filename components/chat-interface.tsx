@@ -15,6 +15,7 @@ import { AppointmentBooking } from './appointment-booking'
 import { DiagnosticBooking } from './diagnostic-booking'
 import { AuroraBackground } from './aurora-background'
 import { usePatient } from '@/lib/patient-context'
+import { auth } from '@/lib/firebase'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface ConversationMessage {
@@ -319,9 +320,13 @@ export function ChatInterface({
     setInput('')
     setIsLoading(true)
     try {
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ query: userText, conversationHistory, uid: patient?.uid }),
       })
       const data = await response.json()
@@ -423,9 +428,13 @@ export function ChatInterface({
         body.newDate = rescheduleDate
         body.newTime = hhmm
       }
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
       const res = await fetch('/api/appointments/manage', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify(body),
       })
       const data = await res.json()
@@ -819,24 +828,6 @@ export function ChatInterface({
           </p>
         </div>
       </motion.div>
-
-      {/* Sample questions */}
-      <div className="px-4 py-2.5 border-b bg-muted/30 shrink-0">
-        <p className="text-xs font-medium text-foreground/50 mb-2">Try asking:</p>
-        <div className="flex flex-wrap gap-1.5">
-          {SAMPLE_QUESTIONS.slice(0, 3).map((q, i) => (
-            <motion.button
-              key={i}
-              whileHover={{ scale: 1.02, y: -1 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => setInput(q)}
-              className="text-xs px-2.5 py-1 rounded-full border border-border bg-background text-foreground/75 hover:text-foreground hover:border-primary/50 hover:bg-primary/5 transition-colors"
-            >
-              {q.length > 40 ? q.substring(0, 40) + '…' : q}
-            </motion.button>
-          ))}
-        </div>
-      </div>
 
       {/* Messages */}
       <div

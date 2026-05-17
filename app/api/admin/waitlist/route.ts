@@ -1,8 +1,12 @@
+import { requireAdminSession } from '@/lib/admin-auth'
 import { NextResponse } from 'next/server'
 import { getWaitlist, deleteWaitlistEntry, type WaitlistEntry } from '@/lib/db'
 
 // GET — list all waitlist entries (with optional filters)
 export async function GET(request: Request) {
+  const adminUser = await requireAdminSession();
+  if (!adminUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   const { searchParams } = new URL(request.url)
   const doctorFilter = searchParams.get('doctorId')
   const dateFilter = searchParams.get('date')
@@ -42,6 +46,9 @@ export async function GET(request: Request) {
 
 // DELETE — remove a specific waitlist entry (admin manually removes someone)
 export async function DELETE(request: Request) {
+  const adminUser = await requireAdminSession();
+  if (!adminUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
 

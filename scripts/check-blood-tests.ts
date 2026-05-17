@@ -23,7 +23,7 @@ const db = getFirestore()
 async function checkBloodTests() {
   const snap = await db.collection('services').get()
   const list = snap.docs.map(d => ({id: d.id, ...d.data()}))
-    .filter(s => String(s.name).toLowerCase().includes('blood test'))
+    .filter(s => String((s as any).name).toLowerCase().includes('blood test'))
   console.log(JSON.stringify(list, null, 2))
 }
 

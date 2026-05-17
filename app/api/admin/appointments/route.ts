@@ -1,3 +1,4 @@
+import { requireAdminSession } from '@/lib/admin-auth'
 import { NextResponse } from 'next/server'
 import {
   getAllAppointments,
@@ -42,6 +43,9 @@ async function promoteFromWaitlist(doctorId: string, date: string, time: string)
 }
 
 export async function GET(request: Request) {
+  const adminUser = await requireAdminSession();
+  if (!adminUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   const { searchParams } = new URL(request.url)
   const dateFilter = searchParams.get('date')
   const statusFilter = searchParams.get('status')
@@ -68,6 +72,9 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  const adminUser = await requireAdminSession();
+  if (!adminUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const { id, status } = await request.json()
 

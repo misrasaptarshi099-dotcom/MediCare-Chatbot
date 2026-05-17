@@ -262,18 +262,35 @@ function buildSystemPrompt(hospitalContext: string, bookedContext: string, patie
 }
 
 // ── POST /api/chat ────────────────────────────────────────────────────────────
+import { adminAuth } from '@/lib/firebase-admin'
+
 export async function POST(request: Request) {
   let userUid: string | undefined
   let userQuery: string | undefined
 
   try {
+    const authHeader = request.headers.get('Authorization')
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.split('Bearer ')[1]
+      try {
+        const decodedToken = await adminAuth.verifyIdToken(token)
+        userUid = decodedToken.uid
+      } catch (e) {
+        return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+      }
+    }
+
     const body = await request.json()
     const { query, conversationHistory = [] } = body as {
       query: string
-      conversationHistory?: ChatMessage[]
+      conversationHistory?: any[]
     }
     userQuery = query
-    userUid = body.uid
+    
+    // If no verified userUid is present but body.uid is, block it to prevent impersonation
+    if (!userUid && body.uid) {
+       return NextResponse.json({ error: 'Unauthorized: missing token' }, { status: 401 })
+    }
 
     if (!query?.trim()) {
       return NextResponse.json({ error: 'Query is required' }, { status: 400 })
