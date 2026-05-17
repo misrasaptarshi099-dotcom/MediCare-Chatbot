@@ -74,16 +74,7 @@ EMAIL_USER=your_email@gmail.com
 EMAIL_PASS=your_gmail_app_password
 ```
 
-### 4. Launch
-```bash
-npm run dev
-```
-Open [http://localhost:3000](http://localhost:3000) and step into the future of healthcare!
-
----
 
 ## 📜 Copyright & Ownership
 
-**© 2024 Saptarshi Misra. All rights reserved.**
-
-This software, including all its source code, design, and architecture, is the exclusive intellectual property of **Saptarshi Misra**. Unauthorized copying, modification, distribution, or commercial use is strictly prohibited.
+This software, including all its source code, design, and architecture, is the exclusive intellectual property of **Saptarshi Misra(@misrasaptarshi099-dotcom)**. Unauthorized copying, modification, distribution, or commercial use is strictly prohibited.
