@@ -438,11 +438,7 @@ async function handleBookConfirm(from: string, input: string, session: WaSession
     patientName: session.patientName || 'WhatsApp Patient',
     patientPhone: from,
     patientEmail: '',
-<<<<<<< HEAD
     ...(session.patientUid ? { patientUid: session.patientUid } : {}),
-=======
-    patientUid: session.patientUid || undefined,
->>>>>>> origin/main
     doctorId: session.data.selectedDoctorId || '',
     doctorName: session.data.selectedDoctorName || '',
     date: session.data.selectedDate || '',
@@ -725,11 +721,7 @@ async function handleCallbackQuery(from: string, input: string, session: WaSessi
       patientName: session.patientName || 'WhatsApp Patient',
       patientPhone: from,
       patientEmail: '',
-<<<<<<< HEAD
       ...(session.patientUid ? { patientUid: session.patientUid } : {}),
-=======
-      patientUid: session.patientUid || undefined,
->>>>>>> origin/main
       querySummary: sanitizedQuery,
       department: session.data.callbackDept || 'General',
       status: 'pending',
