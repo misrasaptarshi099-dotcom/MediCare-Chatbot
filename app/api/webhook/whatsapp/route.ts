@@ -46,7 +46,15 @@ interface WhatsAppWebhookPayload {
   }>
 }
 
-// ── GET: Webhook Verification ─────────────────────────────────────────────────
+/**
+ * Handle the Meta/WhatsApp webhook verification handshake.
+ *
+ * Validates that `hub.mode` equals "subscribe" and that the provided `hub.verify_token`
+ * matches the `WHATSAPP_VERIFY_TOKEN` environment variable, then echoes `hub.challenge`
+ * as plain text.
+ *
+ * @returns A NextResponse containing the verification challenge as plain text with status 200 on success; status 400 if the verification request is invalid; status 403 if the verify token is missing or does not match.
+ */
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -66,7 +74,11 @@ export async function GET(request: Request) {
   return new NextResponse(challenge, { status: 200 })
 }
 
-// ── POST: Incoming Messages ───────────────────────────────────────────────────
+/**
+ * Handles incoming WhatsApp webhook POSTs: verifies the request signature (if configured), parses and processes messages, marks messages as read, and forwards parsed messages to the conversation handler.
+ *
+ * @returns A JSON Next.js response acknowledging processing. Returns `{ ok: true }` when the payload is accepted or contains no messages to process; returns `{ error: 'Invalid webhook signature' }` with HTTP 401 when signature verification fails.
+ */
 
 export async function POST(request: Request) {
   const rawBody = await request.text()
@@ -109,7 +121,15 @@ export async function POST(request: Request) {
   }
 }
 
-// ── Message Parser ────────────────────────────────────────────────────────────
+/**
+ * Convert a raw WhatsApp message payload into the application's IncomingMessage shape or return null for unsupported or invalid messages.
+ *
+ * @param message - The raw WhatsApp message object. Supported input types:
+ *   - Text messages with `text.body`
+ *   - Interactive button replies with `interactive.button_reply.id`
+ *   - Interactive list replies with `interactive.list_reply.id`
+ * @returns The mapped IncomingMessage containing `from`, `messageId`, `type`, and either `text`, `buttonReplyId`, or `listReplyId`; `null` if required fields are missing or the message type is unsupported.
+ */
 
 function parseIncomingMessage(message: WhatsAppMessage): IncomingMessage | null {
   const from = message.from

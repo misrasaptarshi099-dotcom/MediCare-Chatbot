@@ -63,8 +63,10 @@ export interface WaSession {
 const COLLECTION = 'waSessions'
 
 /**
- * Retrieve the current session for a WhatsApp phone number.
- * Returns null if no session exists yet.
+ * Retrieve the persisted WhatsApp session for the given phone number.
+ *
+ * @param phone - The WhatsApp phone number used as the session document ID
+ * @returns The session record for `phone`, or `null` if no document exists
  */
 export async function getWaSession(phone: string): Promise<WaSession | null> {
   const doc = await db.collection(COLLECTION).doc(phone).get()
@@ -72,8 +74,12 @@ export async function getWaSession(phone: string): Promise<WaSession | null> {
 }
 
 /**
- * Create or update a session. Uses Firestore merge so partial
- * updates don't wipe existing fields.
+ * Create or update the WhatsApp session for the given phone.
+ *
+ * Merges the provided session fields into the stored session and updates the session's `lastActive` timestamp.
+ *
+ * @param phone - The WhatsApp phone identifier used as the session document ID
+ * @param updates - Partial session fields to set or merge into the stored session; omitted fields remain unchanged
  */
 export async function setWaSession(phone: string, updates: Partial<WaSession>): Promise<void> {
   await db.collection(COLLECTION).doc(phone).set(
@@ -83,7 +89,11 @@ export async function setWaSession(phone: string, updates: Partial<WaSession>): 
 }
 
 /**
- * Reset a session back to the main menu, clearing all temporary data.
+ * Reset the WhatsApp session for a phone to the `MAIN_MENU` state and clear session data.
+ *
+ * @param phone - The WhatsApp phone identifier used as the session document ID
+ * @param patientUid - Optional patient UID to store on the session; when omitted the stored value is set to `null`
+ * @param patientName - Optional patient name to store on the session; when omitted the stored value is set to `null`
  */
 export async function resetWaSession(phone: string, patientUid?: string, patientName?: string): Promise<void> {
   await db.collection(COLLECTION).doc(phone).set({

@@ -48,7 +48,14 @@ export interface IncomingMessage {
   listReplyId?: string
 }
 
-// ── Main Router ───────────────────────────────────────────────────────────────
+/**
+ * Route an incoming WhatsApp message to the appropriate conversation handler based on the sender's session state.
+ *
+ * This function ensures a session exists (auto-linking a patient by phone if needed), applies global reset commands
+ * (e.g., "menu", "hi", "start"), and dispatches the extracted user input to the handler for the current `WaSession.step`.
+ *
+ * @param msg - The incoming WhatsApp payload containing the sender, message id, and user input (text, button, or list reply)
+ */
 
 export async function handleWhatsAppMessage(msg: IncomingMessage): Promise<void> {
   const { from } = msg
@@ -102,7 +109,12 @@ export async function handleWhatsAppMessage(msg: IncomingMessage): Promise<void>
   }
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+/**
+ * Extracts the user's chosen input from an IncomingMessage.
+ *
+ * @param msg - The incoming WhatsApp payload; preference is given to `buttonReplyId`, then `listReplyId`, then trimmed `text`.
+ * @returns The selected reply identifier or trimmed text, or an empty string if no input is present.
+ */
 
 function extractUserInput(msg: IncomingMessage): string {
   if (msg.buttonReplyId) return msg.buttonReplyId
@@ -110,11 +122,23 @@ function extractUserInput(msg: IncomingMessage): string {
   return msg.text?.trim() || ''
 }
 
+/**
+ * Truncates a string to a maximum length and appends a trailing ellipsis when truncation occurs.
+ *
+ * @param str - The input string to truncate
+ * @param max - The maximum allowed length of the returned string
+ * @returns The original `str` if its length is less than or equal to `max`; otherwise a truncated string no longer than `max` characters that ends with `…`
+ */
 function truncate(str: string, max: number): string {
   return str.length > max ? str.slice(0, max - 1) + '…' : str
 }
 
-// ── Main Menu ─────────────────────────────────────────────────────────────────
+/**
+ * Sends the main menu list to a WhatsApp recipient, greeting the user and presenting service options.
+ *
+ * @param to - Destination phone number in E.164 format
+ * @param patientName - Optional patient name inserted into the greeting
+ */
 
 async function sendMainMenu(to: string, patientName?: string): Promise<void> {
   const greeting = patientName ? `Hello ${patientName}! 👋` : 'Hello! 👋'
@@ -142,7 +166,13 @@ async function sendMainMenu(to: string, patientName?: string): Promise<void> {
   )
 }
 
-// ── Main Menu Choice Router ───────────────────────────────────────────────────
+/**
+ * Routes a user's main-menu selection to the appropriate conversation flow or re-displays the main menu.
+ *
+ * @param from - The sender's E.164 phone number
+ * @param input - The selected menu action identifier (e.g. `menu_book`, `menu_reports`, `menu_ai`)
+ * @param session - The current WhatsApp session for the sender
+ */
 
 async function handleMainMenuChoice(from: string, input: string, session: WaSession): Promise<void> {
   switch (input) {
@@ -169,7 +199,15 @@ async function handleMainMenuChoice(from: string, input: string, session: WaSess
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  BOOKING FLOW
-// ═══════════════════════════════════════════════════════════════════════════════
+/**
+ * Initiates the booking flow by presenting the user a list of available departments.
+ *
+ * If no departments exist, notifies the user and returns them to the main menu. Otherwise,
+ * saves the available department IDs in the session and sends a department picker list.
+ *
+ * @param from - The sender's E.164 phone number to send messages to
+ * @param session - Current WhatsApp session for the user
+ */
 
 async function startBookingFlow(from: string, session: WaSession): Promise<void> {
   const departments = await getDepartments()
@@ -202,6 +240,15 @@ async function startBookingFlow(from: string, session: WaSession): Promise<void>
   )
 }
 
+/**
+ * Handle a department selection during the booking flow and present available doctors.
+ *
+ * Validates the department selected by `input`, finds doctors for that department, updates the user's session to the `BOOK_DOCTOR` step with the selected department and doctor list, and sends a doctor selection list to the user. If the selection is invalid or no doctors are available, notifies the user and restarts the booking flow.
+ *
+ * @param from - The user's E.164 phone number to send messages to
+ * @param input - Raw selection string in the form `"dept_<departmentId>"` (e.g., `"dept_cardiology"`)
+ * @param session - The current `WaSession` for the user; used to persist selection and next step
+ */
 async function handleBookDept(from: string, input: string, session: WaSession): Promise<void> {
   // input is like "dept_cardiology"
   const deptId = input.replace('dept_', '')
@@ -252,6 +299,16 @@ async function handleBookDept(from: string, input: string, session: WaSession): 
   )
 }
 
+/**
+ * Advance the booking flow by recording the chosen doctor and prompting the user to pick a date.
+ *
+ * Stores the selected doctor's id, name, and fee in the session and sets the step to `BOOK_DATE`,
+ * then sends a button message offering the next three calendar dates.
+ *
+ * @param from - The user's phone number (E.164) to send messages to
+ * @param input - The interactive selection id expected in the form `doc_<doctorId>`
+ * @param session - Current WhatsApp session; used to read existing session data (e.g., selected department name)
+ */
 async function handleBookDoctor(from: string, input: string, session: WaSession): Promise<void> {
   const doctorId = input.replace('doc_', '')
   const allDoctors = await getDoctors()
@@ -290,6 +347,15 @@ async function handleBookDoctor(from: string, input: string, session: WaSession)
   )
 }
 
+/**
+ * Process a user-selected booking date, compute available time slots, update the session, and prompt the user to choose a slot.
+ *
+ * Validates the incoming `input` (expected as `date_YYYY-MM-DD`), verifies the selected doctor, filters out already booked times for that date, stores the resulting slot list in the session with step `BOOK_SLOT`, and sends a WhatsApp list of available slots. If the date is invalid or the doctor is missing it sends an error and returns the user to an appropriate earlier step.
+ *
+ * @param from - The patient's phone number (E.164) to send messages to
+ * @param input - The raw user input identifier (expected to be `date_YYYY-MM-DD`)
+ * @param session - The current `WaSession` for the user (used to read/write booking state and stored selections)
+ */
 async function handleBookDate(from: string, input: string, session: WaSession): Promise<void> {
   const selectedDate = input.replace('date_', '')
 
@@ -351,6 +417,12 @@ async function handleBookDate(from: string, input: string, session: WaSession): 
   )
 }
 
+/**
+ * Normalize a time string into 24-hour `HH:mm` format when possible.
+ *
+ * @param value - Input time, e.g. `HH:mm` or `h:mm AM/PM` (whitespace is ignored)
+ * @returns The time in `HH:mm` 24-hour format if the input can be parsed, otherwise the trimmed input
+ */
 function normalizeToHHMM(value: string): string {
   const trimmed = value.trim()
   if (/^\d{2}:\d{2}$/.test(trimmed)) return trimmed
@@ -366,6 +438,11 @@ function normalizeToHHMM(value: string): string {
   return `${hours.toString().padStart(2, '0')}:${minutes}`
 }
 
+/**
+ * Handles a slot selection from the user, stores the chosen time in session, advances the flow to the booking confirmation step, and prompts the user to confirm or cancel.
+ *
+ * @param input - User selection string in the form `slot_{index}` where `{index}` is the zero-based index into `session.data.slotList`
+ */
 async function handleBookSlot(from: string, input: string, session: WaSession): Promise<void> {
   // input is like "slot_0", "slot_1" etc.
   const slotIndex = parseInt(input.replace('slot_', ''), 10)
@@ -397,6 +474,18 @@ async function handleBookSlot(from: string, input: string, session: WaSession): 
   )
 }
 
+/**
+ * Finalize a pending booking: cancel, prompt, or confirm and persist the appointment.
+ *
+ * If the user cancels, the session is reset and the main menu is sent. If the user confirms,
+ * a new appointment record is created and persisted, a confirmation message with a booking reference
+ * is sent, then the session is reset and the main menu is shown. If the input is neither confirm nor
+ * cancel, the user is asked to tap Confirm or Cancel.
+ *
+ * @param from - The sender's phone number (E.164)
+ * @param input - The user's confirmation input (`confirm_yes` or `confirm_no`)
+ * @param session - Current WhatsApp session containing selected booking details
+ */
 async function handleBookConfirm(from: string, input: string, session: WaSession): Promise<void> {
   if (input === 'confirm_no') {
     await sendTextMessage(from, '❌ Booking cancelled.')
@@ -451,7 +540,12 @@ async function handleBookConfirm(from: string, input: string, session: WaSession
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  VIEW APPOINTMENTS
-// ═══════════════════════════════════════════════════════════════════════════════
+/**
+ * Sends the caller their upcoming scheduled appointments or informs them there are none, then resets the session and returns to the main menu.
+ *
+ * @param from - The caller's E.164 phone number (destination for outgoing messages)
+ * @param session - The current WhatsApp session containing patient linkage and session state used to filter appointments and update/reset the session
+ */
 
 async function startViewAppointments(from: string, session: WaSession): Promise<void> {
   if (!session.patientUid && !from) {
@@ -485,6 +579,12 @@ async function startViewAppointments(from: string, session: WaSession): Promise<
   return sendMainMenu(from, session.patientName)
 }
 
+/**
+ * Resets the user's WhatsApp session and sends the main menu.
+ *
+ * @param from - The sender's phone number in E.164 format
+ * @param session - The current WaSession used to preserve patient linkage when resetting
+ */
 async function handleViewAppointments(from: string, _input: string, session: WaSession): Promise<void> {
   // This step exists for potential future sub-actions (cancel, reschedule)
   await resetWaSession(from, session.patientUid, session.patientName)
@@ -493,7 +593,16 @@ async function handleViewAppointments(from: string, _input: string, session: WaS
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  LAB REPORTS
-// ═══════════════════════════════════════════════════════════════════════════════
+/**
+ * Initiates the lab reports viewing flow for the given WhatsApp session.
+ *
+ * If the session is not linked to a patient, informs the user and returns to the main menu.
+ * If the patient has no reports, informs the user and returns to the main menu.
+ * Otherwise, stores a `reportList` in the session, sets the session step to `REPORT_SELECT`, and sends a selectable list (up to 10) of the patient's lab reports.
+ *
+ * @param from - Destination phone number (E.164) to send messages to
+ * @param session - Current WhatsApp session object used to determine patient linkage and to persist `REPORT_SELECT` state and `reportList`
+ */
 
 async function startViewReports(from: string, session: WaSession): Promise<void> {
   if (!session.patientUid) {
@@ -535,10 +644,26 @@ async function startViewReports(from: string, session: WaSession): Promise<void>
   )
 }
 
+/**
+ * Initiates the lab reports viewing flow for the given WhatsApp session.
+ *
+ * @param from - The sender's E.164 phone number used to identify the patient and send replies
+ * @param _input - Ignored; present to match the router signature
+ * @param session - The current WhatsApp session containing patient linkage and session data
+ */
 async function handleViewReports(from: string, _input: string, session: WaSession): Promise<void> {
   return startViewReports(from, session)
 }
 
+/**
+ * Handles a user's lab report selection, sends the report file if available, then resets the session and returns to the main menu.
+ *
+ * Validates the selected report index, fetches the report record, attempts to deliver the report as a document, notifies the user of success or failure, and always resets the WhatsApp session before presenting the main menu.
+ *
+ * @param from - The sender's phone number in E.164 format
+ * @param input - The raw interactive input identifier (e.g., `report_0`)
+ * @param session - The current WhatsApp session containing `data.reportList` and patient metadata
+ */
 async function handleReportSelect(from: string, input: string, session: WaSession): Promise<void> {
   const reportIndex = parseInt(input.replace('report_', ''), 10)
   const reportList = session.data.reportList || []
@@ -579,7 +704,15 @@ async function handleReportSelect(from: string, input: string, session: WaSessio
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  AI DOCTOR CHAT
-// ═══════════════════════════════════════════════════════════════════════════════
+/**
+ * Sends the user's message to the AI doctor model using hospital context and delivers the model's plain-text reply to the user on WhatsApp.
+ *
+ * If the AI request fails, sends a concise fallback error message instructing the user to try again or return to the main menu.
+ *
+ * @param from - The recipient phone number in E.164 format
+ * @param input - The user's chat message to send to the AI model
+ * @param session - Current WhatsApp session data (used for session continuity)
+ */
 
 async function handleAiChat(from: string, input: string, session: WaSession): Promise<void> {
   try {
@@ -619,7 +752,12 @@ async function handleAiChat(from: string, input: string, session: WaSession): Pr
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  CALLBACK REQUEST
-// ═══════════════════════════════════════════════════════════════════════════════
+/**
+ * Prompts the user to choose a department for a callback and advances the session to the callback-department step.
+ *
+ * @param from - Recipient phone number in E.164 format
+ * @param session - Current WhatsApp session object; existing session data is preserved when advancing the step
+ */
 
 async function startCallbackFlow(from: string, session: WaSession): Promise<void> {
   const departments = await getDepartments()
@@ -645,6 +783,13 @@ async function startCallbackFlow(from: string, session: WaSession): Promise<void
   )
 }
 
+/**
+ * Handle a department selection for a callback request and prompt the user to describe their query.
+ *
+ * @param from - The user's phone number in E.164 format
+ * @param input - The raw selection payload (expected to start with `cb_dept_` followed by the department id)
+ * @param session - The current WhatsApp session; will be updated to record the chosen department and advance the step to request the query description
+ */
 async function handleCallbackDept(from: string, input: string, session: WaSession): Promise<void> {
   const deptId = input.replace('cb_dept_', '')
   const departments = await getDepartments()
@@ -666,6 +811,13 @@ async function handleCallbackDept(from: string, input: string, session: WaSessio
   )
 }
 
+/**
+ * Creates a callback ticket from the user's input, informs the user of success or failure, then resets the session and returns to the main menu.
+ *
+ * @param from - The sender's E.164 phone number
+ * @param input - The user's free-text summary of their callback request
+ * @param session - The current WhatsApp session containing patient and flow state (used to attach patient and department context)
+ */
 async function handleCallbackQuery(from: string, input: string, session: WaSession): Promise<void> {
   try {
     await addCallbackTicket({
