@@ -165,9 +165,18 @@ export async function POST(request: Request) {
       try {
         await handleWhatsAppMessage(incoming)
         processedCount++
-      } catch (error) {
+      } catch (error: any) {
         errorCount++
         console.error(`Failed to process message ${message.id}:`, error)
+        
+        // Log the exact error to Firestore for debugging
+        await db.collection('webhookErrors').add({
+          messageId: message.id,
+          timestamp: new Date().toISOString(),
+          error: error.message || String(error),
+          stack: error.stack || null,
+        }).catch(console.error)
+        
         // Continue processing remaining messages in the batch
       }
     }
