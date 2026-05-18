@@ -61,10 +61,12 @@ export async function POST(request: Request) {
     // If Firebase Auth doesn't know this user, check if they were already
     // auto-registered via WhatsApp (Firestore patient record exists).
     let existingPatientName: string | undefined
+    let existingPatientUid: string | undefined
     if (!userExists && isPhone) {
       const existing = await getPatientByIdentifier(normalizedIdentifier)
       if (existing) {
         existingPatientName = existing.name || 'WhatsApp User'
+        existingPatientUid = existing.uid
       }
     }
 
@@ -91,6 +93,7 @@ export async function POST(request: Request) {
 
     if (!userExists) {
       const newUserParams: any = { displayName }
+      if (existingPatientUid) newUserParams.uid = existingPatientUid
       if (isPhone) newUserParams.phoneNumber = normalizedIdentifier
       else newUserParams.email = normalizedIdentifier
 

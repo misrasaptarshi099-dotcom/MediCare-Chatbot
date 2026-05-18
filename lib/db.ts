@@ -525,18 +525,31 @@ export async function getAllPatients(): Promise<Patient[]> {
 }
 
 export async function getPatientByIdentifier(identifier: string): Promise<Patient | null> {
-  const normalized = identifier.toLowerCase().trim()
+  const normalized = identifier.trim()
 
-  // Try email first
-  const emailSnap = await db.collection('patients').where('email', '==', normalized).limit(1).get()
-  if (!emailSnap.empty) {
-    return emailSnap.docs[0].data() as Patient
+  // Try email first (lowercase for email)
+  if (normalized.includes('@')) {
+    const emailSnap = await db.collection('patients').where('email', '==', normalized.toLowerCase()).limit(1).get()
+    if (!emailSnap.empty) {
+      return emailSnap.docs[0].data() as Patient
+    }
+    return null
   }
 
-  // Try phone number
-  const phoneSnap = await db.collection('patients').where('phone', '==', normalized).limit(1).get()
-  if (!phoneSnap.empty) {
-    return phoneSnap.docs[0].data() as Patient
+  // Try phone number — check BOTH formats to avoid duplicate creation
+  // WhatsApp sends "917044321580", portal stores "+917044321580"
+  const phoneVariants: string[] = [normalized]
+  if (normalized.startsWith('+')) {
+    phoneVariants.push(normalized.slice(1)) // "+917..." → "917..."
+  } else if (/^\d+$/.test(normalized)) {
+    phoneVariants.push(`+${normalized}`)   // "917..." → "+917..."
+  }
+
+  for (const phone of phoneVariants) {
+    const phoneSnap = await db.collection('patients').where('phone', '==', phone).limit(1).get()
+    if (!phoneSnap.empty) {
+      return phoneSnap.docs[0].data() as Patient
+    }
   }
 
   return null
