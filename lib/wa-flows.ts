@@ -28,6 +28,7 @@ import {
   getAllAppointments,
   addAppointment,
   getPatientByIdentifier,
+  createOrUpdatePatient,
   getPatientReportsByUid,
   addCallbackTicket,
   buildHospitalContext,
@@ -55,8 +56,22 @@ export async function handleWhatsAppMessage(msg: IncomingMessage): Promise<void>
   let session = await getWaSession(from)
   if (!session) {
     // Auto-link patient from existing database if phone number matches
-    const patient = await getPatientByIdentifier(from)
-    await resetWaSession(from, patient?.uid, patient?.name)
+    let patient = await getPatientByIdentifier(from)
+    
+    // ── Auto-Registration (Lazy Onboarding) ──
+    if (!patient) {
+      // Generate a unique ID for the new WhatsApp patient
+      const newUid = `wa-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 8)}`
+      
+      patient = await createOrUpdatePatient({
+        uid: newUid,
+        name: 'WhatsApp User', // Default placeholder name
+        phone: from,
+        authProviders: ['phone']
+      })
+    }
+
+    await resetWaSession(from, patient.uid, patient.name)
     session = (await getWaSession(from))!
   }
 
@@ -423,7 +438,7 @@ async function handleBookConfirm(from: string, input: string, session: WaSession
     patientName: session.patientName || 'WhatsApp Patient',
     patientPhone: from,
     patientEmail: '',
-    patientUid: session.patientUid || undefined,
+    ...(session.patientUid ? { patientUid: session.patientUid } : {}),
     doctorId: session.data.selectedDoctorId || '',
     doctorName: session.data.selectedDoctorName || '',
     date: session.data.selectedDate || '',
@@ -706,7 +721,7 @@ async function handleCallbackQuery(from: string, input: string, session: WaSessi
       patientName: session.patientName || 'WhatsApp Patient',
       patientPhone: from,
       patientEmail: '',
-      patientUid: session.patientUid || undefined,
+      ...(session.patientUid ? { patientUid: session.patientUid } : {}),
       querySummary: sanitizedQuery,
       department: session.data.callbackDept || 'General',
       status: 'pending',
