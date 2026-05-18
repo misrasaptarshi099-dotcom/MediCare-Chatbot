@@ -63,19 +63,19 @@ async function isMessageAlreadyProcessed(messageId: string): Promise<boolean> {
   const docRef = db.collection(PROCESSED_COLLECTION).doc(messageId)
 
   try {
-    const doc = await docRef.get()
-    if (doc.exists) return true
-
-    // Mark as processing — TTL will be handled by a cleanup cron later
-    await docRef.set({
+    // Atomically claim this message ID — create() fails if doc already exists
+    await docRef.create({
       processedAt: new Date().toISOString(),
       // Auto-expire after 24 hours (Firestore TTL policy can enforce this)
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     })
-
     return false
-  } catch {
-    // If Firestore fails, allow processing (better to double-send than drop)
+  } catch (error: unknown) {
+    // ALREADY_EXISTS (code 6) means another instance already claimed this message
+    if (error instanceof Error && 'code' in error && (error as { code: number }).code === 6) {
+      return true
+    }
+    // Other Firestore errors — allow processing (better to double-send than drop)
     console.error(`Idempotency check failed for message ${messageId}`)
     return false
   }

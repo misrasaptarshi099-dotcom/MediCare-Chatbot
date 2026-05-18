@@ -307,7 +307,11 @@ async function handleBookDate(from: string, input: string, session: WaSession): 
     return sendMainMenu(from, session.patientName)
   }
 
-  const dayOfWeek = new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
+  // Parse date parts directly to avoid timezone shift on non-UTC servers
+  const [year, month, day] = selectedDate.split('-').map(Number)
+  const dayOfWeek = new Date(Date.UTC(year, month - 1, day))
+    .toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' })
+    .toLowerCase()
   const allSlots = doctor.availability[dayOfWeek] || []
 
   // Filter out already booked slots
@@ -373,7 +377,10 @@ async function handleBookSlot(from: string, input: string, session: WaSession): 
 
   if (isNaN(slotIndex) || slotIndex < 0 || slotIndex >= availableSlots.length) {
     await sendTextMessage(from, '❌ Invalid slot selection. Please choose from the list.')
-    return
+    // Re-show the date picker so the user can pick a valid slot
+    return session.data.selectedDoctorId
+      ? handleBookDoctor(from, `doc_${session.data.selectedDoctorId}`, session)
+      : startBookingFlow(from, session)
   }
 
   const selectedTime = availableSlots[slotIndex]
@@ -454,11 +461,9 @@ async function handleBookConfirm(from: string, input: string, session: WaSession
 // ═══════════════════════════════════════════════════════════════════════════════
 
 async function startViewAppointments(from: string, session: WaSession): Promise<void> {
-  if (!session.patientUid && !from) {
-    await sendTextMessage(from, '❌ We couldn\'t find your profile. Please book through our website first or contact us directly.')
-    await resetWaSession(from, session.patientUid, session.patientName)
-    return sendMainMenu(from, session.patientName)
-  }
+  // Note: `from` is always truthy (phone number), so we only check patientUid.
+  // Without a linked profile, we still fall through to match by phone number below.
+
 
   const allApts = await getAllAppointments()
   const myApts = allApts.filter(a =>
