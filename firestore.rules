@@ -68,6 +68,15 @@ service cloud.firestore {
     match /unansweredQueries/{document} {
       allow read, write: if false;
     }
+
+    // WhatsApp bot data — strictly server-side (Admin SDK only)
+    // No client-side access permitted to prevent session manipulation
+    match /waSessions/{document} {
+      allow read, write: if false;
+    }
+    match /waProcessedMessages/{document} {
+      allow read, write: if false;
+    }
     
     // Default deny
     match /{document=**} {
