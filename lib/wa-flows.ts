@@ -66,7 +66,7 @@ export async function handleWhatsAppMessage(msg: IncomingMessage): Promise<void>
       patient = await createOrUpdatePatient({
         uid: newUid,
         name: 'WhatsApp User', // Default placeholder name
-        phone: from,
+        phone: from.startsWith('+') ? from : `+${from}`,
         authProviders: ['phone']
       })
     }
