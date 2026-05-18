@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getOtp, deleteOtp, createOrUpdatePatient } from '@/lib/db'
+import { getOtp, deleteOtp, createOrUpdatePatient, getPatientByIdentifier } from '@/lib/db'
 import { adminAuth } from '@/lib/firebase-admin'
 
 export async function POST(request: Request) {
@@ -57,7 +57,18 @@ export async function POST(request: Request) {
       userExists = false
     }
 
-    if (!userExists && !isLinking && !name) {
+    // ── Bridge WhatsApp auto-registered patients ──────────────────────────
+    // If Firebase Auth doesn't know this user, check if they were already
+    // auto-registered via WhatsApp (Firestore patient record exists).
+    let existingPatientName: string | undefined
+    if (!userExists && isPhone) {
+      const existing = await getPatientByIdentifier(normalizedIdentifier)
+      if (existing) {
+        existingPatientName = existing.name || 'WhatsApp User'
+      }
+    }
+
+    if (!userExists && !isLinking && !name && !existingPatientName) {
       // First time login requires a name! We should tell the client to ask for a name.
       // We DO NOT delete the OTP yet, because they need to submit it again with their name.
       return NextResponse.json({ 
@@ -75,8 +86,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true })
     }
 
+    // Determine the display name: explicit input > existing Firestore record > fallback
+    const displayName = name || existingPatientName || 'Patient'
+
     if (!userExists) {
-      const newUserParams: any = { displayName: name }
+      const newUserParams: any = { displayName }
       if (isPhone) newUserParams.phoneNumber = normalizedIdentifier
       else newUserParams.email = normalizedIdentifier
 
@@ -91,7 +105,7 @@ export async function POST(request: Request) {
 
     // Upsert the Patient record in Firestore
     const patientData: any = { uid, authProviders: [isPhone ? 'phone' : 'email'] }
-    if (name) patientData.name = name
+    if (displayName) patientData.name = displayName
     if (isPhone) patientData.phone = normalizedIdentifier
     else patientData.email = normalizedIdentifier
 
