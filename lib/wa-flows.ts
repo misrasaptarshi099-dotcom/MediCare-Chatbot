@@ -198,11 +198,14 @@ async function startBookingFlow(from: string, session: WaSession): Promise<void>
   const sections: ListSection[] = [
     {
       title: 'Departments',
-      rows: departments.map(d => ({
-        id: `dept_${d.id}`,
-        title: truncate(d.name, 24),
-        description: truncate(d.description || d.location || '', 72),
-      })),
+      rows: departments.map(d => {
+        const desc = d.description || d.location || ''
+        return {
+          id: `dept_${d.id}`,
+          title: truncate(d.name, 24),
+          ...(desc ? { description: truncate(desc, 72) } : {}),
+        }
+      }),
     },
   ]
 
