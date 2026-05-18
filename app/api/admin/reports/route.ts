@@ -57,24 +57,52 @@ export async function POST(request: Request) {
     const formData = await request.formData()
     
     const patientName = formData.get('patientName') as string
-    const patientEmail = formData.get('patientEmail') as string
-    const patientPhone = formData.get('patientPhone') as string
+    const patientEmail = (formData.get('patientEmail') as string) || ''
+    const patientPhone = (formData.get('patientPhone') as string) || ''
     const reportType = formData.get('reportType') as 'blood_test' | 'xray'
     const testName = formData.get('testName') as string
     const notes = formData.get('notes') as string
     const appointmentId = formData.get('appointmentId') as string | null
     const file = formData.get('file') as File | null
 
-    if (!patientName || !patientEmail || !reportType || !testName || !file) {
+    if (!patientName || !reportType || !testName || !file) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    // 2. Resolve patientUid for strict linking (Move this up to use for storage path)
+    let patientUid = ''
+    if (appointmentId) {
+      const appointments = await getAllAppointments()
+      const apt = appointments.find(a => a.id === appointmentId)
+      if (apt?.patientUid) {
+        patientUid = apt.patientUid
+      }
+    }
+    const normalizedEmail = patientEmail ? patientEmail.toLowerCase().trim() : ''
+    if (!patientUid && (normalizedEmail || patientPhone)) {
+      // Fallback: lookup by email or phone
+      const patients = await getAllPatients()
+      const match = patients.find(p => 
+        (p.email && p.email.toLowerCase().trim() === normalizedEmail) || 
+        (p.phone && p.phone === patientPhone)
+      )
+      if (match) {
+        patientUid = match.uid
+      }
+    }
+
+    if (!patientUid && !patientEmail && !patientPhone) {
+       return NextResponse.json({ error: 'Patient must have an email, phone, or linked appointment to upload a report' }, { status: 400 })
     }
 
     // 1. Upload file to Firebase Cloud Storage
     const bucket = storage.bucket()
     const fileExtension = file.name.split('.').pop()
     const safeFileName = `${reportType}_${Date.now()}.${fileExtension}`
-    const normalizedEmail = patientEmail.toLowerCase().trim()
-    const storagePath = `reports/${normalizedEmail}/${safeFileName}`
+    
+    // Use UID if no email
+    const storageFolder = normalizedEmail || patientUid || 'unlinked'
+    const storagePath = `reports/${storageFolder}/${safeFileName}`
     const storageFile = bucket.file(storagePath)
 
     const arrayBuffer = await file.arrayBuffer()
@@ -99,34 +127,13 @@ export async function POST(request: Request) {
       fileUrl = signedUrl
     }
 
-    // 2. Resolve patientUid for strict linking
-    let patientUid = ''
-    if (appointmentId) {
-      const appointments = await getAllAppointments()
-      const apt = appointments.find(a => a.id === appointmentId)
-      if (apt?.patientUid) {
-        patientUid = apt.patientUid
-      }
-    }
-    if (!patientUid) {
-      // Fallback: lookup by email or phone
-      const patients = await getAllPatients()
-      const match = patients.find(p => 
-        (p.email && p.email.toLowerCase().trim() === normalizedEmail) || 
-        (p.phone && p.phone === patientPhone)
-      )
-      if (match) {
-        patientUid = match.uid
-      }
-    }
-
     // 3. Save metadata to Firestore
     const reportId = uuidv4()
     const report: LabReport = {
       id: reportId,
       patientName,
       patientEmail: normalizedEmail,
-      patientPhone: patientPhone || '',
+      patientPhone: patientPhone,
       ...(patientUid && { patientUid }),
       reportType,
       testName,
@@ -134,7 +141,7 @@ export async function POST(request: Request) {
       storagePath,
       fileName: file.name,
       notes: notes || '',
-      status: 'pending',
+      status: normalizedEmail ? 'pending' : 'sent', // If no email, go straight to uploaded/sent
       ...(appointmentId && { appointmentId }),
       createdAt: new Date().toISOString()
     }

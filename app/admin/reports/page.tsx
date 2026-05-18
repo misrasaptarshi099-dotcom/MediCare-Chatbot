@@ -44,6 +44,7 @@ export default function AdminReportsPage() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [sendingId, setSendingId] = useState<string | null>(null)
+  const [prefilled, setPrefilled] = useState({ name: false, email: false, phone: false })
   
   // Upload Form State
   const [formData, setFormData] = useState({
@@ -91,6 +92,11 @@ export default function AdminReportsPage() {
         notes: '',
         appointmentId: apt.id,
       })
+      setPrefilled({
+        name: !!apt.patientName,
+        email: !!apt.patientEmail,
+        phone: !!apt.patientPhone
+      })
     } else {
       setFormData({
         patientName: '',
@@ -101,6 +107,7 @@ export default function AdminReportsPage() {
         notes: '',
         appointmentId: '',
       })
+      setPrefilled({ name: false, email: false, phone: false })
     }
     setSelectedFile(null)
     setIsUploadModalOpen(true)
@@ -467,6 +474,8 @@ export default function AdminReportsPage() {
                   id="patientName" 
                   value={formData.patientName}
                   onChange={e => setFormData({...formData, patientName: e.target.value})}
+                  readOnly={prefilled.name}
+                  className={prefilled.name ? "bg-muted" : ""}
                   required 
                 />
               </div>
@@ -477,17 +486,20 @@ export default function AdminReportsPage() {
                   type="email"
                   value={formData.patientEmail}
                   onChange={e => setFormData({...formData, patientEmail: e.target.value})}
-                  required 
+                  readOnly={prefilled.email}
+                  className={prefilled.email ? "bg-muted" : ""}
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="patientPhone">Patient Phone (Optional)</Label>
+              <Label htmlFor="patientPhone">Patient Phone</Label>
               <Input 
                 id="patientPhone" 
                 value={formData.patientPhone}
                 onChange={e => setFormData({...formData, patientPhone: e.target.value})}
+                readOnly={prefilled.phone}
+                className={prefilled.phone ? "bg-muted" : ""}
               />
             </div>
 
