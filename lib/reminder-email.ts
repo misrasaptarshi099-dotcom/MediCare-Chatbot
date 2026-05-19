@@ -504,6 +504,10 @@ export async function sendAppointmentReminder(apt: Appointment): Promise<void> {
   const to = apt.patientEmail
   if (!to) throw new Error('No patient email on appointment')
 
+  await sendEmail(to, getSubjectLine(apt), '', buildReminderHtml(apt))
+}
+
+export async function sendEmail(to: string, subject: string, text: string, html?: string): Promise<void> {
   const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
@@ -512,8 +516,9 @@ export async function sendAppointmentReminder(apt: Appointment): Promise<void> {
   await transporter.sendMail({
     from: `"MediCare Hospital" <${process.env.EMAIL_USER}>`,
     to,
-    subject: getSubjectLine(apt),
-    html: buildReminderHtml(apt),
+    subject,
+    text,
+    ...(html ? { html } : {})
   })
 }
 

@@ -73,7 +73,7 @@ export interface Appointment {
   date: string
   time: string
   service: string
-  status: 'scheduled' | 'completed' | 'cancelled'
+  status: 'scheduled' | 'completed' | 'cancelled' | 'waitlist'
   paymentStatus?: 'paid' | 'unpaid' | 'refunded'
   amount?: number
   createdAt: string
@@ -159,6 +159,7 @@ export interface LabReport {
   storagePath?: string
   fileName: string
   notes?: string
+  doctorNotes?: string
   status: 'pending' | 'ready' | 'sent'
   appointmentId?: string
   createdAt: string
@@ -232,6 +233,16 @@ export async function getAppointments(filters?: {
 export async function getAllAppointments(): Promise<Appointment[]> {
   const snap = await db.collection('appointments').get()
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment))
+}
+
+export async function getAppointment(id: string): Promise<Appointment | null> {
+  const doc = await db.collection('appointments').doc(id).get()
+  if (!doc.exists) return null
+  return { id: doc.id, ...doc.data() } as Appointment
+}
+
+export async function updateAppointmentStatus(id: string, status: Appointment['status']): Promise<void> {
+  await db.collection('appointments').doc(id).update({ status, updatedAt: new Date().toISOString() })
 }
 
 export async function addAppointment(appointment: Appointment): Promise<void> {
@@ -438,7 +449,7 @@ export async function buildHospitalContext(): Promise<string> {
       .filter(([, slots]) => slots.length > 0)
       .map(([day, slots]) => `${day}: ${slots.join(', ')}`)
       .join(' | ')
-    return `- ${d.name} | ${d.specialty} | ${d.department} | Room ${d.roomNumber} | Fee ₹${d.consultationFee} | Today (${dayName}) slots: [${todaySlots.join(', ') || 'none'}] | Full week: ${weekSummary}`
+    return `- ${d.name} (id: ${d.id}) | ${d.specialty} | ${d.department} | Room ${d.roomNumber} | Fee ₹${d.consultationFee} | Today (${dayName}) slots: [${todaySlots.join(', ') || 'none'}] | Full week: ${weekSummary}`
   }).join('\n')
 
   const deptLines = departments.map(d =>

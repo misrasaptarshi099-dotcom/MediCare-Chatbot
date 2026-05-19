@@ -23,7 +23,10 @@ export type WaStep =
   | 'AI_CHAT'
   | 'CALLBACK_DEPT'
   | 'CALLBACK_QUERY'
-
+  | 'ASK_NAME'
+  | 'BOOK_CUSTOM_DATE'
+  | 'ASK_EMAIL'
+  | 'VERIFY_EMAIL_OTP'
 export interface WaSessionData {
   /** Cached list of department IDs for the current menu */
   deptList?: string[]
@@ -46,6 +49,9 @@ export interface WaSessionData {
   selectedService?: string
 
   callbackDept?: string
+
+  /** AI chat conversation history for multi-turn context */
+  chatHistory?: Array<{ role: 'user' | 'model'; text: string }>
 }
 
 export interface WaSession {
