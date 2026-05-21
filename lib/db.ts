@@ -249,6 +249,29 @@ export async function addAppointment(appointment: Appointment): Promise<void> {
   await db.collection('appointments').doc(appointment.id).set(appointment)
 }
 
+export async function addAppointmentTransactional(newAppointment: Appointment): Promise<{ status: Appointment['status'] }> {
+  return await db.runTransaction(async (t) => {
+    const existingSnap = await t.get(
+      db.collection('appointments')
+        .where('doctorId', '==', newAppointment.doctorId)
+        .where('date', '==', newAppointment.date)
+        .where('time', '==', newAppointment.time)
+        .where('status', '==', 'scheduled')
+    )
+    
+    let finalStatus = newAppointment.status
+    if (!existingSnap.empty && finalStatus === 'scheduled') {
+      finalStatus = 'waitlist'
+    }
+    
+    const docRef = db.collection('appointments').doc(newAppointment.id)
+    const appointmentToSave = { ...newAppointment, status: finalStatus }
+    t.set(docRef, appointmentToSave)
+    
+    return { status: finalStatus }
+  })
+}
+
 export async function updateAppointment(id: string, data: Partial<Appointment>): Promise<void> {
   await db.collection('appointments').doc(id).update(data)
 }
@@ -352,11 +375,27 @@ export async function saveChatSession(uid: string, messages: ChatMessage[], last
 }
 
 export async function appendChatMessages(uid: string, newMessages: ChatMessage[], lastUpdated: string): Promise<void> {
-  await db.collection('chatSessions').doc(uid).set({
-    uid,
-    messages: FieldValue.arrayUnion(...newMessages),
-    lastUpdated,
-  }, { merge: true })
+  const docRef = db.collection('chatSessions').doc(uid)
+  await db.runTransaction(async (t) => {
+    const doc = await t.get(docRef)
+    const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000
+    const cutoff = Date.now() - THREE_MONTHS_MS
+    
+    let existingMessages: ChatMessage[] = []
+    if (doc.exists) {
+      existingMessages = (doc.data() as ChatSession).messages || []
+    }
+    
+    const combined = [...existingMessages, ...newMessages]
+    const pruned = combined.filter(m => m.timestamp >= cutoff)
+    const finalMessages = pruned.slice(-1000) // cap to 1000 messages
+    
+    t.set(docRef, {
+      uid,
+      messages: finalMessages,
+      lastUpdated,
+    }, { merge: true })
+  })
 }
 
 export async function getAllChatSessions(): Promise<ChatSession[]> {

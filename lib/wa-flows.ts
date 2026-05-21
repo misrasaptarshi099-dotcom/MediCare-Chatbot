@@ -27,6 +27,7 @@ import {
   getDoctors,
   getAllAppointments,
   addAppointment,
+  addAppointmentTransactional,
   getPatientByIdentifier,
   createOrUpdatePatient,
   getPatientReportsByUid,
@@ -712,22 +713,12 @@ async function handleBookConfirm(from: string, input: string, session: WaSession
   }
 
   try {
-    const { getAppointments, addAppointment } = await import('./db')
+    // Attempt to book atomically
+    const { status: finalStatus } = await addAppointmentTransactional(newAppointment)
     
-    // Fresh availability check to prevent race conditions
-    const existing = await getAppointments({
-      doctorId: newAppointment.doctorId,
-      date: newAppointment.date,
-      status: 'scheduled'
-    })
-    const isBooked = existing.some(a => a.time === newAppointment.time)
-    
-    if (!slotData.isWaitlist && isBooked) {
+    if (finalStatus === 'waitlist' && !slotData.isWaitlist) {
       slotData.isWaitlist = true
-      newAppointment.status = 'waitlist'
     }
-
-    await addAppointment(newAppointment)
     
     // Cancel the old appointment if this is a reschedule
     if (session.data.reschedulingAptId) {

@@ -204,40 +204,63 @@ export async function processAiMessage(from: string, input: string, session: WaS
         else if (call.name === 'check_availability') {
           const { doctorId, date } = call.args as any
           const doc = (await getDoctors()).find(d => d.id === doctorId || d.name.toLowerCase().includes(String(doctorId).toLowerCase()))
+          
           if (!doc) {
             functionResponse = { error: 'Doctor not found. Ensure you are using a valid Doctor ID.' }
           } else {
             const [year, month, day] = date.split('-').map(Number)
-            const dayOfWeek = new Date(Date.UTC(year, month - 1, day)).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' }).toLowerCase()
-            const allSlots = doc.availability[dayOfWeek] || []
+            const dateObj = new Date(Date.UTC(year, month - 1, day))
+            const formattedDate = dateObj.toISOString().split('T')[0]
             
-            const appointments = await getAllAppointments()
-            const bookedTimes = new Set(appointments.filter(a => a.doctorId === doc.id && a.date === date && a.status === 'scheduled').map(a => a.time))
-            
-            const slots = allSlots.map(time => {
-              const isBooked = bookedTimes.has(time)
-              return { time, status: isBooked ? 'waitlist' : 'available' }
-            })
-            functionResponse = { date, doctorId: doc.id, doctorName: doc.name, slots }
+            if (formattedDate !== date) {
+              functionResponse = { error: 'Invalid date. Please provide a valid calendar date in YYYY-MM-DD format.' }
+            } else {
+              const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' }).toLowerCase()
+              const allSlots = doc.availability[dayOfWeek] || []
+              
+              const appointments = await getAllAppointments()
+              const bookedTimes = new Set(appointments.filter(a => a.doctorId === doc.id && a.date === date && a.status === 'scheduled').map(a => a.time))
+              
+              const slots = allSlots.map(time => {
+                const isBooked = bookedTimes.has(time)
+                return { time, status: isBooked ? 'waitlist' : 'available' }
+              })
+              functionResponse = { date, doctorId: doc.id, doctorName: doc.name, slots }
+            }
           }
         }
         else if (call.name === 'book_appointment') {
-          const { doctorId, date, time, service, amount } = call.args as any
+          const { doctorId, date, time, service } = call.args as any
           const doc = (await getDoctors()).find(d => d.id === doctorId || d.name.toLowerCase().includes(String(doctorId).toLowerCase()))
           
           if (!doc) {
             functionResponse = { error: 'Doctor not found. Ensure you are using a valid Doctor ID.' }
           } else {
-            // Check if it's waitlist
-            const appointments = await getAllAppointments()
-            const isBooked = appointments.some(a => a.doctorId === doc.id && a.date === date && a.time === time && a.status === 'scheduled')
-            
-            const newId = `apt-${Date.now()}`
-            // Normalize phone to include + prefix if missing
-            const normalizedPhone = from.startsWith('+') ? from : `+${from}`
-            const finalAmount = amount !== undefined ? amount : doc.consultationFee
+            // Validate Date
+            const [year, month, day] = date.split('-').map(Number)
+            const dateObj = new Date(Date.UTC(year, month - 1, day))
+            if (dateObj.toISOString().split('T')[0] !== date) {
+              functionResponse = { error: 'Invalid date. Please provide a valid calendar date in YYYY-MM-DD format.' }
+              continue
+            }
 
-            await addAppointment({
+            // Derive server-side pricing
+            let finalAmount = doc.consultationFee
+            if (doctorId.startsWith('LAB-')) {
+              const { getServices } = await import('./db')
+              const allServices = await getServices()
+              const matchedService = allServices.find(s => s.id === doctorId.replace('LAB-', '') || s.name.toLowerCase() === (service || '').toLowerCase())
+              if (matchedService) finalAmount = matchedService.basePrice
+            }
+            if (typeof finalAmount !== 'number' || isNaN(finalAmount)) {
+              finalAmount = 500 // safe fallback
+            }
+
+            const newId = `apt-${Date.now()}`
+            const normalizedPhone = from.startsWith('+') ? from : `+${from}`
+
+            const { addAppointmentTransactional } = await import('./db')
+            const { status: finalStatus } = await addAppointmentTransactional({
               id: newId,
               patientName: session.patientName || 'WhatsApp Patient',
               patientPhone: normalizedPhone,
@@ -248,7 +271,7 @@ export async function processAiMessage(from: string, input: string, session: WaS
               date,
               time,
               service: service || 'General Consultation',
-              status: isBooked ? 'waitlist' : 'scheduled',
+              status: 'scheduled',
               amount: finalAmount,
               paymentStatus: 'unpaid',
               createdAt: new Date().toISOString()
@@ -257,7 +280,7 @@ export async function processAiMessage(from: string, input: string, session: WaS
             functionResponse = { 
               success: true, 
               appointmentId: newId, 
-              status: isBooked ? 'waitlist' : 'confirmed',
+              status: finalStatus,
               paymentLink: `https://medi-care-chatbot.vercel.app/pay?aptId=${newId}`,
               amountToBePaid: finalAmount
             }
