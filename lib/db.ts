@@ -1,6 +1,5 @@
 import { db } from './firestore'
-
-// ── Interfaces ────────────────────────────────────────────────────────────────
+import { FieldValue } from 'firebase-admin/firestore'// ── Interfaces ────────────────────────────────────────────────────────────────
 
 export interface Doctor {
   id: string
@@ -77,6 +76,7 @@ export interface Appointment {
   paymentStatus?: 'paid' | 'unpaid' | 'refunded'
   amount?: number
   createdAt: string
+  updatedAt?: string
 }
 
 export interface UnansweredQuery {
@@ -349,6 +349,14 @@ export async function saveChatSession(uid: string, messages: ChatMessage[], last
     messages,
     lastUpdated,
   })
+}
+
+export async function appendChatMessages(uid: string, newMessages: ChatMessage[], lastUpdated: string): Promise<void> {
+  await db.collection('chatSessions').doc(uid).set({
+    uid,
+    messages: FieldValue.arrayUnion(...newMessages),
+    lastUpdated,
+  }, { merge: true })
 }
 
 export async function getAllChatSessions(): Promise<ChatSession[]> {

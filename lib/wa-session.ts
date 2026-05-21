@@ -47,6 +47,7 @@ export interface WaSessionData {
   selectedDate?: string   // YYYY-MM-DD
   selectedTime?: string   // HH:mm or display format
   selectedService?: string
+  reschedulingAptId?: string
 
   callbackDept?: string
 

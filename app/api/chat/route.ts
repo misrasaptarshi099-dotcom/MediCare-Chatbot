@@ -5,7 +5,7 @@ import {
   getAllAppointments,
   addUnansweredQuery,
   getChatSession,
-  saveChatSession,
+  appendChatMessages,
   getInsurancePartners,
   getDoctors,
   type Appointment,
@@ -322,11 +322,11 @@ export async function POST(request: Request) {
           const existing = await getChatSession(effectiveUid)
           const existingMessages = existing?.messages ?? []
           const timestamp = Date.now()
-          existingMessages.push(
+          const newMsgs: DbChatMessage[] = [
             { id: `u-${timestamp}`, type: 'user', content: query, timestamp },
             { id: `a-${timestamp}`, type: 'assistant', content: responseMessage, timestamp }
-          )
-          await saveChatSession(effectiveUid, existingMessages, new Date().toISOString())
+          ]
+          await appendChatMessages(effectiveUid, newMsgs, new Date().toISOString())
         } catch {}
       }
 
@@ -402,8 +402,7 @@ export async function POST(request: Request) {
         const userMsg: DbChatMessage = { id: `u-${timestamp}`, type: 'user', content: query, timestamp }
         const aiMsg: DbChatMessage = { id: `a-${timestamp}`, type: 'assistant', content: parsed.message, timestamp }
 
-        existingMessages.push(userMsg, aiMsg)
-        await saveChatSession(effectiveUid, existingMessages, new Date().toISOString())
+        await appendChatMessages(effectiveUid, [userMsg, aiMsg], new Date().toISOString())
       } catch (err) {
         console.error('Failed to save chat history:', err)
       }
@@ -440,8 +439,7 @@ export async function POST(request: Request) {
         }
         const aiMsg: DbChatMessage = { id: `a-${timestamp}`, type: 'assistant', content: errorReply, timestamp }
 
-        existingMessages.push(userMsg, aiMsg)
-        await saveChatSession(userUid, existingMessages, new Date().toISOString())
+        await appendChatMessages(userUid, [userMsg, aiMsg], new Date().toISOString())
       } catch (saveErr) {
         console.error('Failed to save chat history on error path:', saveErr)
       }

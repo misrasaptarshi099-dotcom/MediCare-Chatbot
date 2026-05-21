@@ -428,8 +428,8 @@ export async function handleBookDoctor(from: string, input: string, session: WaS
       step: 'BOOK_DATE',
       data: {
         ...session.data,
-        selectedDoctorId: 'LAB', // Dummy doctor ID for lab
-        selectedDoctorName: 'Lab Technician',
+        selectedDoctorId: `LAB-${service.id}`,
+        selectedDoctorName: `Lab: ${service.name}`,
         selectedDoctorFee: service.basePrice,
         selectedService: service.name,
       },
@@ -516,10 +516,10 @@ export async function handleBookDate(from: string, input: string, session: WaSes
 
   // Get available slots for the selected doctor on the selected date
   let doctor: any = null
-  if (session.data.selectedDoctorId === 'LAB') {
+  if (session.data.selectedDoctorId?.startsWith('LAB-')) {
     doctor = {
-      id: 'LAB',
-      name: 'Lab Technician',
+      id: session.data.selectedDoctorId,
+      name: session.data.selectedDoctorName || 'Lab Technician',
       availability: {
         monday: ['09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '02:00 PM', '03:00 PM', '04:00 PM'],
         tuesday: ['09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '02:00 PM', '03:00 PM', '04:00 PM'],
@@ -564,7 +564,7 @@ export async function handleBookDate(from: string, input: string, session: WaSes
   if (slotList.length === 0) {
     await sendTextMessage(from, `😔 Sorry, Dr. ${doctor.name} has no slots configured on this day of the week. Please try another date.`)
     // Re-show the date picker
-    return session.data.selectedDoctorId === 'LAB' 
+    return session.data.selectedDoctorId?.startsWith('LAB-') 
       ? startBookingFlow(from, session)
       : handleBookDoctor(from, `doc_${doctor.id}`, session)
   }
@@ -712,7 +712,28 @@ async function handleBookConfirm(from: string, input: string, session: WaSession
   }
 
   try {
+    const { getAppointments, addAppointment } = await import('./db')
+    
+    // Fresh availability check to prevent race conditions
+    const existing = await getAppointments({
+      doctorId: newAppointment.doctorId,
+      date: newAppointment.date,
+      status: 'scheduled'
+    })
+    const isBooked = existing.some(a => a.time === newAppointment.time)
+    
+    if (!slotData.isWaitlist && isBooked) {
+      slotData.isWaitlist = true
+      newAppointment.status = 'waitlist'
+    }
+
     await addAppointment(newAppointment)
+    
+    // Cancel the old appointment if this is a reschedule
+    if (session.data.reschedulingAptId) {
+      const { updateAppointmentStatus } = await import('./db')
+      await updateAppointmentStatus(session.data.reschedulingAptId, 'cancelled')
+    }
     
     if (slotData.isWaitlist) {
       // Find position in waitlist
@@ -795,24 +816,37 @@ async function handleViewAppointments(from: string, input: string, session: WaSe
   
   if (isCancel || isPay || isReschedule) {
     const aptId = input.replace('cancel_', '').replace('pay_', '').replace('reschedule_', '')
-    if (isCancel || isReschedule) {
-      const { updateAppointmentStatus, getAppointment } = await import('./db')
+    const { getAppointment, updateAppointmentStatus } = await import('./db')
+    const apt = await getAppointment(aptId)
+
+    const normalizedFrom = from.startsWith('+') ? from : `+${from}`
+    const aptPhone = apt?.patientPhone?.startsWith('+') ? apt.patientPhone : `+${apt?.patientPhone}`
+    
+    if (!apt || (apt.patientUid !== session.patientUid && aptPhone !== normalizedFrom)) {
+      await sendTextMessage(from, '❌ Access denied or appointment not found.')
+      await resetWaSession(from, session.patientUid, session.patientName)
+      return sendMainMenu(from, session.patientName)
+    }
+
+    if (isCancel) {
       await updateAppointmentStatus(aptId, 'cancelled')
-      
-      if (isCancel) {
-        await sendTextMessage(from, `❌ Appointment ${aptId} has been cancelled successfully.`)
+      await sendTextMessage(from, `❌ Appointment ${aptId} has been cancelled successfully.`)
+    } else if (isReschedule) {
+      await sendTextMessage(from, `🔄 Let's pick a new date and time. Your current appointment will be cancelled only after you confirm the new one.`)
+      if (apt.doctorId) {
+        // Store old appointment id in session for deferring cancellation
+        await setWaSession(from, {
+          ...session,
+          data: { ...session.data, reschedulingAptId: aptId }
+        })
+        return handleBookDoctor(from, `doc_${apt.doctorId}`, session)
       } else {
-        const apt = await getAppointment(aptId)
-        await sendTextMessage(from, `🔄 Your previous appointment has been cancelled. Let's pick a new date and time.`)
-        if (apt && apt.doctorId) {
-          // Route directly to book that doctor again
-          await resetWaSession(from, session.patientUid, session.patientName)
-          return handleBookDoctor(from, `doc_${apt.doctorId}`, session)
-        }
+        return startBookingFlow(from, session)
       }
-    } else {
+    } else if (isPay) {
       await sendTextMessage(from, `💳 *Payment Link:*\nhttps://medi-care-chatbot.vercel.app/pay?aptId=${aptId}`)
     }
+
     await resetWaSession(from, session.patientUid, session.patientName)
     return sendMainMenu(from, session.patientName)
   }

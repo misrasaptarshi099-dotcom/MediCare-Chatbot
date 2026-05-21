@@ -500,11 +500,28 @@ function getSubjectLine(apt: Appointment): string {
   return `🧪 Reminder: ${preps.length} tests (${preps.map(p => p.label).join(', ')}) tomorrow — ${apt.date} at ${apt.time}`
 }
 
+function buildReminderText(apt: Appointment): string {
+  const preps = getAllTestPreps(apt.service || '')
+  const testList = preps.length > 0 ? preps.map(p => p.label).join(', ') : (apt.service || 'Appointment')
+  
+  return `Reminder: Your appointment with ${apt.doctorName} is tomorrow!
+  
+Details:
+- Test/Service: ${testList}
+- Date: ${apt.date}
+- Time: ${apt.time}
+- Patient: ${apt.patientName}
+
+Please arrive 15-20 minutes early and bring your government ID, insurance card, and any previous reports.
+If you need to cancel or reschedule, please log in to the Patient Portal.
+`
+}
+
 export async function sendAppointmentReminder(apt: Appointment): Promise<void> {
   const to = apt.patientEmail
   if (!to) throw new Error('No patient email on appointment')
 
-  await sendEmail(to, getSubjectLine(apt), '', buildReminderHtml(apt))
+  await sendEmail(to, getSubjectLine(apt), buildReminderText(apt), buildReminderHtml(apt))
 }
 
 export async function sendEmail(to: string, subject: string, text: string, html?: string): Promise<void> {
