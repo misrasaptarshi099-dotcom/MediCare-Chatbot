@@ -1,6 +1,5 @@
 import { db } from './firestore'
-
-// ── Interfaces ────────────────────────────────────────────────────────────────
+import { FieldValue } from 'firebase-admin/firestore'// ── Interfaces ────────────────────────────────────────────────────────────────
 
 export interface Doctor {
   id: string
@@ -73,10 +72,11 @@ export interface Appointment {
   date: string
   time: string
   service: string
-  status: 'scheduled' | 'completed' | 'cancelled'
+  status: 'scheduled' | 'completed' | 'cancelled' | 'waitlist'
   paymentStatus?: 'paid' | 'unpaid' | 'refunded'
   amount?: number
   createdAt: string
+  updatedAt?: string
 }
 
 export interface UnansweredQuery {
@@ -159,6 +159,7 @@ export interface LabReport {
   storagePath?: string
   fileName: string
   notes?: string
+  doctorNotes?: string
   status: 'pending' | 'ready' | 'sent'
   appointmentId?: string
   createdAt: string
@@ -234,8 +235,41 @@ export async function getAllAppointments(): Promise<Appointment[]> {
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment))
 }
 
+export async function getAppointment(id: string): Promise<Appointment | null> {
+  const doc = await db.collection('appointments').doc(id).get()
+  if (!doc.exists) return null
+  return { id: doc.id, ...doc.data() } as Appointment
+}
+
+export async function updateAppointmentStatus(id: string, status: Appointment['status']): Promise<void> {
+  await db.collection('appointments').doc(id).update({ status, updatedAt: new Date().toISOString() })
+}
+
 export async function addAppointment(appointment: Appointment): Promise<void> {
   await db.collection('appointments').doc(appointment.id).set(appointment)
+}
+
+export async function addAppointmentTransactional(newAppointment: Appointment): Promise<{ status: Appointment['status'] }> {
+  return await db.runTransaction(async (t) => {
+    const existingSnap = await t.get(
+      db.collection('appointments')
+        .where('doctorId', '==', newAppointment.doctorId)
+        .where('date', '==', newAppointment.date)
+        .where('time', '==', newAppointment.time)
+        .where('status', '==', 'scheduled')
+    )
+    
+    let finalStatus = newAppointment.status
+    if (!existingSnap.empty && finalStatus === 'scheduled') {
+      finalStatus = 'waitlist'
+    }
+    
+    const docRef = db.collection('appointments').doc(newAppointment.id)
+    const appointmentToSave = { ...newAppointment, status: finalStatus }
+    t.set(docRef, appointmentToSave)
+    
+    return { status: finalStatus }
+  })
 }
 
 export async function updateAppointment(id: string, data: Partial<Appointment>): Promise<void> {
@@ -340,6 +374,30 @@ export async function saveChatSession(uid: string, messages: ChatMessage[], last
   })
 }
 
+export async function appendChatMessages(uid: string, newMessages: ChatMessage[], lastUpdated: string): Promise<void> {
+  const docRef = db.collection('chatSessions').doc(uid)
+  await db.runTransaction(async (t) => {
+    const doc = await t.get(docRef)
+    const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000
+    const cutoff = Date.now() - THREE_MONTHS_MS
+    
+    let existingMessages: ChatMessage[] = []
+    if (doc.exists) {
+      existingMessages = (doc.data() as ChatSession).messages || []
+    }
+    
+    const combined = [...existingMessages, ...newMessages]
+    const pruned = combined.filter(m => m.timestamp >= cutoff)
+    const finalMessages = pruned.slice(-1000) // cap to 1000 messages
+    
+    t.set(docRef, {
+      uid,
+      messages: finalMessages,
+      lastUpdated,
+    }, { merge: true })
+  })
+}
+
 export async function getAllChatSessions(): Promise<ChatSession[]> {
   const snap = await db.collection('chatSessions').get()
   const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000
@@ -438,7 +496,7 @@ export async function buildHospitalContext(): Promise<string> {
       .filter(([, slots]) => slots.length > 0)
       .map(([day, slots]) => `${day}: ${slots.join(', ')}`)
       .join(' | ')
-    return `- ${d.name} | ${d.specialty} | ${d.department} | Room ${d.roomNumber} | Fee ₹${d.consultationFee} | Today (${dayName}) slots: [${todaySlots.join(', ') || 'none'}] | Full week: ${weekSummary}`
+    return `- ${d.name} (id: ${d.id}) | ${d.specialty} | ${d.department} | Room ${d.roomNumber} | Fee ₹${d.consultationFee} | Today (${dayName}) slots: [${todaySlots.join(', ') || 'none'}] | Full week: ${weekSummary}`
   }).join('\n')
 
   const deptLines = departments.map(d =>

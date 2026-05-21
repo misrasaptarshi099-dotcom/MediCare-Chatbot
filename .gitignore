@@ -25,3 +25,7 @@ coderabbit*
 test_*.mjs
 parse_review.js
 test_output.txt
+
+# Scratch/diagnostic scripts and build logs
+/scratch/
+*.tsbuildinfo
