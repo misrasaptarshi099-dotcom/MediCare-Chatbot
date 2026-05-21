@@ -18,6 +18,8 @@ node_modules/
 .cursor/
 skills-lock.json
 /scripts/
+/scratch
+
 
 # CodeRabbit and Debug Outputs
 coderabbit*
