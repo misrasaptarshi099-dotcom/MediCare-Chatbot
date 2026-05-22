@@ -136,10 +136,7 @@ export async function processAiMessage(from: string, input: string, session: WaS
         patientAppointmentsContext = `\n\n=== THIS PATIENT'S UPCOMING APPOINTMENTS ===\n${lines}\n(Use these IDs when the patient wants to cancel or reschedule. If an appointment is unpaid, provide them with the Payment Link so they can pay.)`
       }
       if (reports.length > 0) {
-        const lines = reports.map(r => 
-          `  - ID: ${r.id} | ${r.testName} | Date: ${(r as any).createdAt ? new Date((r as any).createdAt).toLocaleDateString() : 'N/A'} | Type: ${r.reportType}`
-        ).join('\n')
-        patientReportsContext = `\n\n=== THIS PATIENT'S LAB REPORTS ===\n${lines}\n(When the patient asks for reports: 1) Call list_lab_reports to show them what's available. 2) When they pick one, call send_lab_report with the reportId to deliver the PDF file directly on WhatsApp. NEVER share internal file URLs, storage links, or patient portal links for reports — always use the send_lab_report tool.)`
+        patientReportsContext = `\n\n=== THIS PATIENT HAS LAB REPORTS ===\nThis patient has ${reports.length} lab report(s) on file. When the patient asks for reports: 1) Call list_lab_reports to retrieve and show them what is available. 2) When they pick one, call send_lab_report with the reportId to deliver the PDF file directly on WhatsApp. NEVER share internal file URLs, storage links, report IDs, or patient portal links for reports — always use the tools.`
       }
     } catch {}
   }
@@ -351,14 +348,23 @@ export async function processAiMessage(from: string, input: string, session: WaS
             if (reports.length === 0) {
               functionResponse = { reports: [], message: 'No lab reports found for this patient.' }
             } else {
-              functionResponse = {
-                reports: reports.map(r => ({
-                  id: r.id,
-                  testName: r.testName,
-                  reportType: r.reportType,
-                  date: new Date(r.createdAt).toLocaleDateString('en-IN'),
-                  status: r.status
-                }))
+              const deliverable = reports.filter(r => !!r.fileUrl)
+              if (deliverable.length === 0) {
+                functionResponse = { reports: [], message: 'No downloadable lab reports are available yet.' }
+              } else {
+                functionResponse = {
+                  reports: deliverable.map(r => {
+                    const d = r.createdAt ? new Date(r.createdAt) : null
+                    const dateStr = d && !isNaN(d.getTime()) ? d.toLocaleDateString('en-IN') : 'N/A'
+                    return {
+                      id: r.id,
+                      testName: r.testName,
+                      reportType: r.reportType,
+                      date: dateStr,
+                      status: r.status
+                    }
+                  })
+                }
               }
             }
           }
@@ -379,7 +385,10 @@ export async function processAiMessage(from: string, input: string, session: WaS
               functionResponse = { error: 'Report file is not available for download yet.' }
             } else {
               try {
-                const caption = `🧪 *${report.testName}*\n📅 ${new Date(report.createdAt).toLocaleDateString('en-IN')}` +
+                const captionDate = report.createdAt ? new Date(report.createdAt) : null
+                const captionDateStr = captionDate && !isNaN(captionDate.getTime()) ? captionDate.toLocaleDateString('en-IN') : ''
+                const caption = `🧪 *${report.testName}*` +
+                  (captionDateStr ? `\n📅 ${captionDateStr}` : '') +
                   (report.doctorNotes ? `\n\n👨‍⚕️ *Doctor's Notes:*\n_${report.doctorNotes}_` : '')
                 await sendDocumentMessage(
                   from,
