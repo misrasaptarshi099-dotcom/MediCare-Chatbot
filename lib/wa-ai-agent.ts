@@ -4,6 +4,7 @@ import {
   getAllAppointments,
   addAppointment,
   getPatientReportsByUid,
+  getLabReport,
   getPatientByIdentifier,
   updateAppointmentStatus,
   getChatSession,
@@ -12,7 +13,7 @@ import {
   type ChatMessage as DbChatMessage
 } from './db'
 import { WaSession, setWaSession } from './wa-session'
-import { sendTextMessage } from './whatsapp'
+import { sendTextMessage, sendDocumentMessage } from './whatsapp'
 import { startBookingFlow, handleBookDept, handleBookDoctor, handleBookDate } from './wa-flows'
 
 export async function processAiMessage(from: string, input: string, session: WaSession, hospitalContext: string): Promise<void> {
@@ -96,6 +97,27 @@ export async function processAiMessage(from: string, input: string, session: WaS
     }
   }
 
+  const listLabReportsFunc: FunctionDeclaration = {
+    name: 'list_lab_reports',
+    description: 'Lists the patient\'s available lab reports and diagnostic results. Returns report IDs, names, dates, and types. Call this first so the patient can choose which report to receive.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {}
+    }
+  }
+
+  const sendLabReportFunc: FunctionDeclaration = {
+    name: 'send_lab_report',
+    description: 'Sends a specific lab report PDF file directly to the patient on WhatsApp. The patient receives the actual document file, not a link. Use a reportId obtained from list_lab_reports.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        reportId: { type: SchemaType.STRING, description: 'The ID of the lab report to send' }
+      },
+      required: ['reportId']
+    }
+  }
+
   let patientAppointmentsContext = ''
   let patientReportsContext = ''
   if (session.patientUid) {
@@ -114,10 +136,7 @@ export async function processAiMessage(from: string, input: string, session: WaS
         patientAppointmentsContext = `\n\n=== THIS PATIENT'S UPCOMING APPOINTMENTS ===\n${lines}\n(Use these IDs when the patient wants to cancel or reschedule. If an appointment is unpaid, provide them with the Payment Link so they can pay.)`
       }
       if (reports.length > 0) {
-        const lines = reports.map(r => 
-          `  - ${r.testName} | Date: ${(r as any).createdAt ? new Date((r as any).createdAt).toLocaleDateString() : 'N/A'}`
-        ).join('\n')
-        patientReportsContext = `\n\n=== THIS PATIENT'S LAB REPORTS ===\n${lines}\n(NEVER share internal file URLs or storage links. To download reports, tell the user to type "menu" and select "My Lab Reports", or visit the patient portal at https://medi-care-chatbot.vercel.app)`
+        patientReportsContext = `\n\n=== THIS PATIENT HAS LAB REPORTS ===\nThis patient has ${reports.length} lab report(s) on file. When the patient asks for reports: 1) Call list_lab_reports to retrieve and show them what is available. 2) When they pick one, call send_lab_report with the reportId to deliver the PDF file directly on WhatsApp. NEVER share internal file URLs, storage links, report IDs, or patient portal links for reports — always use the tools.`
       }
     } catch {}
   }
@@ -146,7 +165,9 @@ export async function processAiMessage(from: string, input: string, session: WaS
         bookAppointmentFunc,
         cancelAppointmentFunc,
         routeToInteractiveFlowFunc,
-        requestCallbackFunc
+        requestCallbackFunc,
+        listLabReportsFunc,
+        sendLabReportFunc
       ]
     }],
     generationConfig: { temperature: 0.2 }
@@ -318,6 +339,70 @@ export async function processAiMessage(from: string, input: string, session: WaS
             createdAt: new Date().toISOString()
           })
           functionResponse = { success: true, ticketId: newId, message: 'Callback requested successfully.' }
+        }
+        else if (call.name === 'list_lab_reports') {
+          if (!session.patientUid) {
+            functionResponse = { error: 'Patient profile not linked to this number. Cannot retrieve reports.' }
+          } else {
+            const reports = await getPatientReportsByUid(session.patientUid)
+            if (reports.length === 0) {
+              functionResponse = { reports: [], message: 'No lab reports found for this patient.' }
+            } else {
+              const deliverable = reports.filter(r => !!r.fileUrl)
+              if (deliverable.length === 0) {
+                functionResponse = { reports: [], message: 'No downloadable lab reports are available yet.' }
+              } else {
+                functionResponse = {
+                  reports: deliverable.map(r => {
+                    const d = r.createdAt ? new Date(r.createdAt) : null
+                    const dateStr = d && !isNaN(d.getTime()) ? d.toLocaleDateString('en-IN') : 'N/A'
+                    return {
+                      id: r.id,
+                      testName: r.testName,
+                      reportType: r.reportType,
+                      date: dateStr,
+                      status: r.status
+                    }
+                  })
+                }
+              }
+            }
+          }
+        }
+        else if (call.name === 'send_lab_report') {
+          const { reportId } = call.args as any
+          if (!session.patientUid) {
+            functionResponse = { error: 'Patient profile not linked. Cannot send reports.' }
+          } else if (!reportId) {
+            functionResponse = { error: 'No reportId provided. Call list_lab_reports first.' }
+          } else {
+            const report = await getLabReport(reportId)
+            if (!report) {
+              functionResponse = { error: 'Report not found.' }
+            } else if (report.patientUid !== session.patientUid) {
+              functionResponse = { error: 'Access denied. This report does not belong to you.' }
+            } else if (!report.fileUrl) {
+              functionResponse = { error: 'Report file is not available for download yet.' }
+            } else {
+              try {
+                const captionDate = report.createdAt ? new Date(report.createdAt) : null
+                const captionDateStr = captionDate && !isNaN(captionDate.getTime()) ? captionDate.toLocaleDateString('en-IN') : ''
+                const caption = `🧪 *${report.testName}*` +
+                  (captionDateStr ? `\n📅 ${captionDateStr}` : '') +
+                  (report.doctorNotes ? `\n\n👨‍⚕️ *Doctor's Notes:*\n_${report.doctorNotes}_` : '')
+                await sendDocumentMessage(
+                  from,
+                  report.fileUrl,
+                  report.fileName || `${report.testName}.pdf`,
+                  caption
+                )
+                functionResponse = { success: true, message: `Report "${report.testName}" has been sent as a document above.` }
+              } catch (err: any) {
+                console.error('Error sending report via AI agent:', err)
+                functionResponse = { error: 'Failed to send the report file. Please try again or type "menu" to use the interactive flow.' }
+              }
+            }
+          }
         }
       } catch (e: any) {
         console.error(`Agent Tool Error (${call.name}):`, e)
