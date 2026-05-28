@@ -12,6 +12,9 @@ export async function POST(request: Request) {
 
     let normalizedIdentifier = identifier.trim()
     const isPhone = /^\+?[0-9]{10,15}$/.test(normalizedIdentifier)
+    if (!isPhone) {
+      normalizedIdentifier = normalizedIdentifier.toLowerCase()
+    }
 
     // Ensure phone numbers have a country code (default to +91 for India if missing)
     if (isPhone && !normalizedIdentifier.startsWith('+')) {

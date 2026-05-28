@@ -28,17 +28,18 @@ export async function GET(request: Request) {
     // If the patient has email/phone in their doc but authProviders or
     // identities are missing them (pre-migration data), fix it now.
     const needsUpdate: string[] = []
+    const authProviders = Array.isArray(patient.authProviders) ? patient.authProviders : []
 
-    if (patient.phone && !patient.authProviders.includes('phone')) {
+    if (patient.phone && !authProviders.includes('phone')) {
       needsUpdate.push('phone')
     }
-    if (patient.email && !patient.authProviders.includes('email')) {
+    if (patient.email && !authProviders.includes('email')) {
       needsUpdate.push('email')
     }
 
     // Sync authProviders if needed
     if (needsUpdate.length > 0) {
-      const updatedProviders = [...new Set([...patient.authProviders, ...needsUpdate])]
+      const updatedProviders = [...new Set([...authProviders, ...needsUpdate])]
       await db.collection('patients').doc(uid).update({
         authProviders: updatedProviders,
         updatedAt: new Date().toISOString(),
@@ -46,22 +47,27 @@ export async function GET(request: Request) {
       patient.authProviders = updatedProviders as typeof patient.authProviders
     }
 
+    let createdPhoneIdentity = false
+    let createdEmailIdentity = false
+
     // Sync missing identity docs
     if (patient.phone) {
       const hasPhoneIdentity = identities.some(i => i.provider === 'phone')
       if (!hasPhoneIdentity) {
         await linkIdentity('phone', patient.phone, uid)
+        createdPhoneIdentity = true
       }
     }
     if (patient.email) {
       const hasEmailIdentity = identities.some(i => i.provider === 'email')
       if (!hasEmailIdentity) {
         await linkIdentity('email', patient.email.toLowerCase(), uid)
+        createdEmailIdentity = true
       }
     }
 
     // Re-fetch identities after sync
-    if (needsUpdate.length > 0 || identities.length === 0) {
+    if (needsUpdate.length > 0 || identities.length === 0 || createdPhoneIdentity || createdEmailIdentity) {
       identities = await getPatientIdentities(uid)
     }
 

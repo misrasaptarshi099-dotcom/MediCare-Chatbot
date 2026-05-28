@@ -235,6 +235,11 @@ export async function getAllAppointments(): Promise<Appointment[]> {
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment))
 }
 
+export async function getAppointmentsByPatientUid(patientUid: string): Promise<Appointment[]> {
+  const snap = await db.collection('appointments').where('patientUid', '==', patientUid).get()
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment))
+}
+
 export async function getAppointment(id: string): Promise<Appointment | null> {
   const doc = await db.collection('appointments').doc(id).get()
   if (!doc.exists) return null
@@ -453,6 +458,11 @@ export async function getCallbackTickets(): Promise<CallbackTicket[]> {
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as CallbackTicket))
 }
 
+export async function getCallbackTicketsByPatientUid(patientUid: string): Promise<CallbackTicket[]> {
+  const snap = await db.collection('callbackTickets').where('patientUid', '==', patientUid).get()
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as CallbackTicket))
+}
+
 export async function addCallbackTicket(ticket: CallbackTicket): Promise<void> {
   await db.collection('callbackTickets').doc(ticket.id).set(ticket)
 }
@@ -594,11 +604,21 @@ export async function resolveIdentity(provider: string, value: string): Promise<
  */
 export async function linkIdentity(provider: string, value: string, patientUid: string): Promise<void> {
   const docId = `${provider}_${value}`
-  await db.collection('identities').doc(docId).set({
-    provider,
-    value,
-    patientUid,
-    linkedAt: new Date().toISOString(),
+  const docRef = db.collection('identities').doc(docId)
+  await db.runTransaction(async (transaction) => {
+    const doc = await transaction.get(docRef)
+    if (doc.exists) {
+      const existing = doc.data() as Identity
+      if (existing.patientUid !== patientUid) {
+        throw new Error(`Identity ${docId} is already linked to another patient (UID: ${existing.patientUid})`)
+      }
+    }
+    transaction.set(docRef, {
+      provider,
+      value,
+      patientUid,
+      linkedAt: new Date().toISOString(),
+    })
   })
 }
 

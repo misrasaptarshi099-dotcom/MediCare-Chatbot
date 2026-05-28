@@ -205,16 +205,18 @@ async function handleVerifyEmailOtp(from: string, input: string, session: WaSess
 
   // Update patient record + write email identity + sync to Firebase Auth
   if (session.patientUid && emailToLink) {
-    await createOrUpdatePatient({ uid: session.patientUid, email: emailToLink, authProviders: ['email'] })
-    await linkIdentity('email', emailToLink, session.patientUid)
-
-    // Sync email to Firebase Auth so Google/Email login can find this user
+    // Sync email to Firebase Auth first so that if it fails, we abort without updating Firestore
     try {
       const { adminAuth } = await import('./firebase-admin')
       await adminAuth.updateUser(session.patientUid, { email: emailToLink })
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to sync email to Firebase Auth:', e)
+      await sendTextMessage(from, `❌ Failed to link email: ${e.message || 'please try again later.'}`)
+      return
     }
+
+    await createOrUpdatePatient({ uid: session.patientUid, email: emailToLink, authProviders: ['email'] })
+    await linkIdentity('email', emailToLink, session.patientUid)
   }
 
   await sendTextMessage(from, `✅ *Email Linked Successfully!*\n\nYour reports and receipts will now also be available at ${emailToLink}.`)

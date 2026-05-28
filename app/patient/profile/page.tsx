@@ -134,7 +134,10 @@ export default function PatientProfilePage() {
 
     try {
       const token = await auth.currentUser?.getIdToken()
-      if (!token) return
+      if (!token) {
+        setDeleting(false)
+        return
+      }
 
       const res = await fetch('/api/patient/profile/delete', {
         method: 'POST',

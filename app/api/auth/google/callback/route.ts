@@ -33,7 +33,8 @@ export async function POST(request: Request) {
           try {
             await adminAuth.deleteUser(uid)
           } catch (e) {
-            console.error('Failed to delete auto-created Google Auth user:', e)
+            console.error('Failed to delete auto-created Google Auth user (uid:', uid, ', existingUid:', existingUid, '):', e)
+            throw e
           }
 
           // Add Google as a linked identity + update patient

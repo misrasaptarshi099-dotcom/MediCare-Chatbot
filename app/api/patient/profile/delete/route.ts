@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { adminAuth } from '@/lib/firebase-admin'
-import { getPatientByUid, deleteAllIdentities, getAllAppointments, getCallbackTickets } from '@/lib/db'
+import { getPatientByUid, deleteAllIdentities, getAppointmentsByPatientUid, getCallbackTicketsByPatientUid } from '@/lib/db'
 import { db } from '@/lib/firestore'
 
 export async function POST(request: Request) {
@@ -29,27 +29,33 @@ export async function POST(request: Request) {
     }
 
     const results: string[] = []
+    const errors: string[] = []
+    const CHUNK_SIZE = 500
 
     // 1. Delete all identity docs
     try {
       await deleteAllIdentities(uid)
       results.push('Deleted identity records')
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to delete identities:', e)
+      errors.push(`deleteAllIdentities: ${e.message || e}`)
     }
 
     // 2. Delete appointments
     try {
-      const appointments = await getAllAppointments()
-      const toDelete = appointments.filter(a => a.patientUid === uid)
-      if (toDelete.length > 0) {
-        const batch = db.batch()
-        toDelete.forEach(a => batch.delete(db.collection('appointments').doc(a.id)))
-        await batch.commit()
-        results.push(`Removed ${toDelete.length} appointment(s)`)
+      const appointments = await getAppointmentsByPatientUid(uid)
+      if (appointments.length > 0) {
+        for (let i = 0; i < appointments.length; i += CHUNK_SIZE) {
+          const chunk = appointments.slice(i, i + CHUNK_SIZE)
+          const batch = db.batch()
+          chunk.forEach(a => batch.delete(db.collection('appointments').doc(a.id)))
+          await batch.commit()
+        }
+        results.push(`Removed ${appointments.length} appointment(s)`)
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to delete appointments:', e)
+      errors.push(`appointments batch delete: ${e.message || e}`)
     }
 
     // 3. Delete chat sessions
@@ -60,43 +66,53 @@ export async function POST(request: Request) {
         await chatRef.delete()
         results.push('Removed chat history')
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to delete chats:', e)
+      errors.push(`chatSessions doc delete: ${e.message || e}`)
     }
 
     // 4. Delete callback tickets
     try {
-      const tickets = await getCallbackTickets()
-      const toDelete = tickets.filter(t => t.patientUid === uid)
-      if (toDelete.length > 0) {
-        const batch = db.batch()
-        toDelete.forEach(t => batch.delete(db.collection('callbackTickets').doc(t.id)))
-        await batch.commit()
-        results.push(`Removed ${toDelete.length} callback ticket(s)`)
+      const tickets = await getCallbackTicketsByPatientUid(uid)
+      if (tickets.length > 0) {
+        for (let i = 0; i < tickets.length; i += CHUNK_SIZE) {
+          const chunk = tickets.slice(i, i + CHUNK_SIZE)
+          const batch = db.batch()
+          chunk.forEach(t => batch.delete(db.collection('callbackTickets').doc(t.id)))
+          await batch.commit()
+        }
+        results.push(`Removed ${tickets.length} callback ticket(s)`)
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to delete callback tickets:', e)
+      errors.push(`callbackTickets batch delete: ${e.message || e}`)
     }
 
     // 5. Delete lab reports
     try {
       const reportsSnap = await db.collection('labReports').where('patientUid', '==', uid).get()
       if (!reportsSnap.empty) {
-        const batch = db.batch()
-        reportsSnap.docs.forEach(doc => batch.delete(doc.ref))
-        await batch.commit()
+        const docs = reportsSnap.docs
+        for (let i = 0; i < docs.length; i += CHUNK_SIZE) {
+          const chunk = docs.slice(i, i + CHUNK_SIZE)
+          const batch = db.batch()
+          chunk.forEach(doc => batch.delete(doc.ref))
+          await batch.commit()
+        }
         results.push(`Removed ${reportsSnap.size} lab report(s)`)
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to delete lab reports:', e)
+      errors.push(`labReports batch delete: ${e.message || e}`)
     }
 
     // 6. Delete patient document
     try {
       await db.collection('patients').doc(uid).delete()
       results.push('Deleted patient profile')
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to delete patient doc:', e)
+      errors.push(`patients doc delete: ${e.message || e}`)
     }
 
     // 7. Delete Firebase Auth user
@@ -106,7 +122,12 @@ export async function POST(request: Request) {
     } catch (e: any) {
       if (e.code !== 'auth/user-not-found') {
         console.error('Failed to delete auth user:', e)
+        errors.push(`adminAuth.deleteUser: ${e.message || e}`)
       }
+    }
+
+    if (errors.length > 0) {
+      return NextResponse.json({ success: false, errors, results }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, results })

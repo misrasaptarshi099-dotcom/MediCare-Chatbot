@@ -200,6 +200,9 @@ export async function POST(request: Request) {
 
     let uid: string
     let normalizedIdentifier = contactValue.trim()
+    if (contactType === 'email') {
+      normalizedIdentifier = normalizedIdentifier.toLowerCase()
+    }
 
     const newUserParams: any = { displayName: name }
 

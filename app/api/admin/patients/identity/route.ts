@@ -52,6 +52,13 @@ export async function POST(request: Request) {
       }
 
       // Update patient doc + identity
+      // First locate and delete any existing identity document for the same uid and provider
+      const existingIdentities = await getPatientIdentities(uid)
+      const staleIdentity = existingIdentities.find(i => i.provider === provider)
+      if (staleIdentity) {
+        await unlinkIdentity(provider, staleIdentity.value)
+      }
+
       await linkAuthProvider(uid, provider as 'email' | 'phone' | 'google', normalizedValue)
       await linkIdentity(provider, normalizedValue, uid)
 

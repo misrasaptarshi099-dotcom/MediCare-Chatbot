@@ -42,22 +42,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `No ${provider} identity linked to this account` }, { status: 404 })
     }
 
-    // 1. Delete the identity document
-    await unlinkIdentity(provider, identityToRemove.value)
+    // 1. Delete the identity document and update patient doc in a single transaction
+    const identityDocId = `${provider}_${identityToRemove.value}`
+    const identityDocRef = db.collection('identities').doc(identityDocId)
+    const patientDocRef = db.collection('patients').doc(uid)
 
-    // 2. Remove provider from patient authProviders and clear contact field
-    const updates: Record<string, any> = {
-      authProviders: FieldValue.arrayRemove(provider),
-      updatedAt: new Date().toISOString(),
-    }
+    await db.runTransaction(async (transaction) => {
+      // Delete the identity doc
+      transaction.delete(identityDocRef)
 
-    if (provider === 'email') {
-      updates.email = FieldValue.delete()
-    } else if (provider === 'phone') {
-      updates.phone = FieldValue.delete()
-    }
+      // Remove provider from patient authProviders and clear contact field
+      const updates: Record<string, any> = {
+        authProviders: FieldValue.arrayRemove(provider),
+        updatedAt: new Date().toISOString(),
+      }
 
-    await db.collection('patients').doc(uid).update(updates)
+      if (provider === 'email') {
+        updates.email = FieldValue.delete()
+      } else if (provider === 'phone') {
+        updates.phone = FieldValue.delete()
+      }
+
+      transaction.update(patientDocRef, updates)
+    })
 
     // 3. Update Firebase Auth user (remove email/phone if applicable)
     try {

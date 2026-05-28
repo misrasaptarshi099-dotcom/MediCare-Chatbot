@@ -421,7 +421,7 @@ export default function PatientDashboard() {
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ ...SPRING, delay: 0.2 }}
-                  className="hidden md:flex items-center gap-2"
+                  className="flex items-center gap-2"
                 >
                   <Link
                     href="/patient/profile"

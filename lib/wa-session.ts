@@ -53,6 +53,9 @@ export interface WaSessionData {
 
   /** AI chat conversation history for multi-turn context */
   chatHistory?: Array<{ role: 'user' | 'model'; text: string }>
+
+  /** Session-persisted mapping of ordinal index string (e.g. "1") to actual reportId */
+  reportMap?: Record<string, string>
 }
 
 export interface WaSession {
