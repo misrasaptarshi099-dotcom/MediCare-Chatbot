@@ -294,23 +294,23 @@ export default function PatientProfilePage() {
           transition={{ ...SPRING, delay: 0.05 }}
         >
           <Card>
-            <CardHeader>
+            <CardHeader className="p-4 sm:p-6">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Shield className="h-5 w-5 text-primary" />
                 Account Info
               </CardTitle>
               <CardDescription>Your basic account details</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between py-2 border-b border-border/50">
+            <CardContent className="p-4 sm:p-6 pt-0 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2 border-b border-border/50 gap-1 sm:gap-0">
                 <span className="text-sm text-muted-foreground">Name</span>
                 <span className="text-sm font-medium">{profile?.name || 'Unknown'}</span>
               </div>
-              <div className="flex items-center justify-between py-2 border-b border-border/50">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between py-2 border-b border-border/50 gap-1 sm:gap-2">
                 <span className="text-sm text-muted-foreground">Patient ID</span>
-                <span className="text-xs font-mono bg-muted px-2 py-1 rounded-md border">{profile?.uid}</span>
+                <span className="text-xs font-mono bg-muted px-2 py-1 rounded-md border break-all max-w-full sm:max-w-[70%] text-left sm:text-right">{profile?.uid}</span>
               </div>
-              <div className="flex items-center justify-between py-2">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2 gap-1 sm:gap-0">
                 <span className="text-sm text-muted-foreground">Member Since</span>
                 <span className="text-sm">
                   {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString('en-IN', { 
@@ -329,36 +329,36 @@ export default function PatientProfilePage() {
           transition={{ ...SPRING, delay: 0.1 }}
         >
           <Card>
-            <CardHeader>
+            <CardHeader className="p-4 sm:p-6">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Link2 className="h-5 w-5 text-primary" />
                 Connected Login Methods
               </CardTitle>
               <CardDescription>Ways you can sign in to your account</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="p-4 sm:p-6 pt-0 space-y-3">
               {linkedProviders.map((provider) => (
-                <div key={provider} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30 group">
+                <div key={provider} className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border bg-muted/20 gap-3 sm:gap-2 group">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
                       {providerIcon(provider)}
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <div className="text-sm font-medium">{providerLabel(provider)}</div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-xs text-muted-foreground break-all">
                         {getIdentityValue(provider) || 'Linked'}
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
+                  <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto border-t sm:border-t-0 pt-2.5 sm:pt-0 border-border/40">
+                    <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 shrink-0">
                       Connected
                     </Badge>
                     {linkedProviders.length > 1 ? (
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 px-2 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="h-8 px-2 text-muted-foreground hover:text-destructive opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                         onClick={() => {
                           setUnlinkConfirm(provider)
                           setUnlinkConfirmText('')
@@ -373,7 +373,7 @@ export default function PatientProfilePage() {
                         )}
                       </Button>
                     ) : (
-                      <span className="text-[10px] text-muted-foreground/60 px-2">Only method</span>
+                      <span className="text-[10px] text-muted-foreground/60 px-2 shrink-0">Only method</span>
                     )}
                   </div>
                 </div>
@@ -405,7 +405,7 @@ export default function PatientProfilePage() {
           transition={{ ...SPRING, delay: 0.15 }}
         >
           <Card className="border-destructive/30">
-            <CardHeader>
+            <CardHeader className="p-4 sm:p-6">
               <CardTitle className="text-lg flex items-center gap-2 text-destructive">
                 <AlertTriangle className="h-5 w-5" />
                 Danger Zone
@@ -414,7 +414,7 @@ export default function PatientProfilePage() {
                 Permanently delete your account and all associated data. This action cannot be undone.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4 sm:p-6 pt-0">
               <Button
                 variant="destructive"
                 className="gap-2"
