@@ -33,6 +33,7 @@ import {
   getPatientReportsByUid,
   addCallbackTicket,
   buildHospitalContext,
+  linkIdentity,
   type Appointment,
 } from './db'
 
@@ -63,13 +64,17 @@ export async function handleWhatsAppMessage(msg: IncomingMessage): Promise<void>
     if (!patient) {
       // Generate a unique ID for the new WhatsApp patient
       const newUid = `wa-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 8)}`
+      const normalizedPhone = from.startsWith('+') ? from : `+${from}`
       
       patient = await createOrUpdatePatient({
         uid: newUid,
         name: '', // Empty so we know they need to provide one
-        phone: from.startsWith('+') ? from : `+${from}`,
+        phone: normalizedPhone,
         authProviders: ['phone']
       })
+
+      // Write phone identity for O(1) lookup
+      await linkIdentity('phone', normalizedPhone, newUid)
     }
 
     if (!patient.name || patient.name === 'WhatsApp User') {
@@ -198,9 +203,18 @@ async function handleVerifyEmailOtp(from: string, input: string, session: WaSess
     return
   }
 
-  // Update patient record
-  if (session.patientUid) {
-    await createOrUpdatePatient({ uid: session.patientUid, email: emailToLink })
+  // Update patient record + write email identity + sync to Firebase Auth
+  if (session.patientUid && emailToLink) {
+    await createOrUpdatePatient({ uid: session.patientUid, email: emailToLink, authProviders: ['email'] })
+    await linkIdentity('email', emailToLink, session.patientUid)
+
+    // Sync email to Firebase Auth so Google/Email login can find this user
+    try {
+      const { adminAuth } = await import('./firebase-admin')
+      await adminAuth.updateUser(session.patientUid, { email: emailToLink })
+    } catch (e) {
+      console.error('Failed to sync email to Firebase Auth:', e)
+    }
   }
 
   await sendTextMessage(from, `✅ *Email Linked Successfully!*\n\nYour reports and receipts will now also be available at ${emailToLink}.`)

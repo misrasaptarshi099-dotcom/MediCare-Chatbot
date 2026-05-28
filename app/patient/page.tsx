@@ -16,7 +16,6 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { auth } from '@/lib/firebase'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
 import { PatientProvider } from '@/lib/patient-context'
-import { AccountLinkDialog } from '@/components/account-link-dialog'
 
 // ── Spring config ─────────────────────────────────────────────────────────────
 const SPRING = { type: 'spring', stiffness: 320, damping: 28, mass: 0.8 } as const
@@ -121,16 +120,29 @@ function AppointmentCard({ apt, index, onPaymentSuccess }: { apt: any; index: nu
   const handlePayNow = async () => {
     setIsPaying(true)
     try {
+      const token = await auth.currentUser?.getIdToken()
+      if (!token) {
+        alert('You must be logged in to make a payment.')
+        return
+      }
       const res = await fetch('/api/payments', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ appointmentId: apt.id, amount: apt.amount })
       })
       if (res.ok) {
+        alert('Payment successful!')
         onPaymentSuccess?.()
+      } else {
+        const errorData = await res.json()
+        alert(`Payment failed: ${errorData.error || 'Unknown error'}`)
       }
-    } catch {
-      console.error('Payment failed')
+    } catch (err: any) {
+      console.error('Payment failed', err)
+      alert('Payment failed. Please try again.')
     } finally {
       setIsPaying(false)
     }
@@ -404,30 +416,20 @@ export default function PatientDashboard() {
               </Link>
 
               <div className="flex items-center gap-3">
-                {/* Profile Pill & Linking */}
+                {/* Profile Pill — links to My Profile page */}
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ ...SPRING, delay: 0.2 }}
                   className="hidden md:flex items-center gap-2"
                 >
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted border border-border/60 text-xs text-muted-foreground mr-2">
+                  <Link
+                    href="/patient/profile"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted border border-border/60 text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors cursor-pointer"
+                  >
                     <User className="h-3 w-3" />
                     <span className="font-medium">{patientProfile?.name}</span>
-                  </div>
-                  
-                  {!patientProfile?.authProviders?.includes('phone') && (
-                    <AccountLinkDialog 
-                      providerToLink="phone" 
-                      onSuccess={() => fetchPatientData(userUid)} 
-                    />
-                  )}
-                  {!patientProfile?.authProviders?.includes('email') && !patientProfile?.authProviders?.includes('google') && (
-                    <AccountLinkDialog 
-                      providerToLink="email" 
-                      onSuccess={() => fetchPatientData(userUid)} 
-                    />
-                  )}
+                  </Link>
                 </motion.div>
 
                 <ThemeToggle />

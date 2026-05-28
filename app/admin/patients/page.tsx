@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { 
   UserX, Search, Trash2, MessageSquare, Calendar, PhoneCall, 
-  Loader2, AlertTriangle, CheckCircle2, Users, Plus
+  Loader2, AlertTriangle, CheckCircle2, Users, Plus, Mail, Phone,
+  Shield, Link2, Unlink
 } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
@@ -17,6 +18,7 @@ type Patient = {
   email: string
   phone: string
   name: string
+  authProviders: string[]
   appointmentCount: number
   callbackCount: number
   chatCount: number
@@ -40,6 +42,7 @@ export default function AdminPatientsPage() {
     deleteChats: true,
     deleteCallbacks: true,
   })
+  const [deleteConfirmName, setDeleteConfirmName] = useState('')
   const [resultMessage, setResultMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   // Add Patient State
@@ -49,6 +52,18 @@ export default function AdminPatientsPage() {
   const [addContactValue, setAddContactValue] = useState('')
   const [isAdding, setIsAdding] = useState(false)
   const [addError, setAddError] = useState('')
+
+  // Identity Management State
+  const [managingPatient, setManagingPatient] = useState<Patient | null>(null)
+  const [linkProvider, setLinkProvider] = useState<'email' | 'phone'>('email')
+  const [linkValue, setLinkValue] = useState('')
+  const [isLinking, setIsLinking] = useState(false)
+  const [isUnlinking, setIsUnlinking] = useState<string | null>(null)
+  const [identityError, setIdentityError] = useState('')
+
+  // Unlink Confirmation State
+  const [unlinkConfirm, setUnlinkConfirm] = useState<{ patient: Patient; provider: string } | null>(null)
+  const [unlinkConfirmText, setUnlinkConfirmText] = useState('')
 
   useEffect(() => {
     fetchPatients()
@@ -85,6 +100,12 @@ export default function AdminPatientsPage() {
       return
     }
 
+    // Safety: require typing patient name to confirm
+    if (deleteConfirmName.toLowerCase() !== confirmTarget.name.toLowerCase()) {
+      setResultMessage({ type: 'error', text: 'Patient name does not match. Please type the exact name to confirm.' })
+      return
+    }
+
     setDeleting(confirmTarget.uid)
     setResultMessage(null)
     try {
@@ -105,6 +126,7 @@ export default function AdminPatientsPage() {
     } finally {
       setDeleting(null)
       setConfirmTarget(null)
+      setDeleteConfirmName('')
     }
   }
 
@@ -141,8 +163,96 @@ export default function AdminPatientsPage() {
     }
   }
 
+  const handleLinkIdentity = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!managingPatient) return
+    setIdentityError('')
+    setIsLinking(true)
+
+    try {
+      const res = await fetch('/api/admin/patients/identity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: managingPatient.uid,
+          action: 'link',
+          provider: linkProvider,
+          value: linkValue,
+        })
+      })
+
+      const data = await res.json()
+      if (res.ok) {
+        setResultMessage({ type: 'success', text: `✓ Linked ${linkProvider} for ${managingPatient.name}` })
+        setLinkValue('')
+        setManagingPatient(null)
+        await fetchPatients()
+      } else {
+        setIdentityError(data.error || 'Failed to link.')
+      }
+    } catch {
+      setIdentityError('Network error.')
+    } finally {
+      setIsLinking(false)
+    }
+  }
+
+  const handleUnlinkIdentity = async () => {
+    if (!unlinkConfirm) return
+    if (unlinkConfirmText.toLowerCase() !== unlinkConfirm.provider.toLowerCase()) return
+
+    const { patient, provider } = unlinkConfirm
+    setIsUnlinking(`${patient.uid}-${provider}`)
+    setResultMessage(null)
+
+    try {
+      const res = await fetch('/api/admin/patients/identity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: patient.uid,
+          action: 'unlink',
+          provider,
+        })
+      })
+
+      const data = await res.json()
+      if (res.ok) {
+        setResultMessage({ type: 'success', text: `✓ Unlinked ${provider} for ${patient.name}` })
+        await fetchPatients()
+      } else {
+        setResultMessage({ type: 'error', text: data.error || 'Failed to unlink.' })
+      }
+    } catch {
+      setResultMessage({ type: 'error', text: 'Network error.' })
+    } finally {
+      setIsUnlinking(null)
+      setUnlinkConfirm(null)
+      setUnlinkConfirmText('')
+    }
+  }
+
   const toggleOption = (key: keyof DeleteOptions) => {
     setDeleteOptions(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const providerBadge = (provider: string) => {
+    const colors: Record<string, string> = {
+      phone: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+      email: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+      google: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20',
+    }
+    const icons: Record<string, React.ReactNode> = {
+      phone: <Phone className="h-3 w-3" />,
+      email: <Mail className="h-3 w-3" />,
+      google: <span className="text-[10px] font-bold">G</span>,
+    }
+    return (
+      <Badge key={provider} variant="outline" className={`gap-1 text-xs ${colors[provider] || ''}`}>
+        {icons[provider]}
+        {provider}
+      </Badge>
+    )
   }
 
   return (
@@ -153,7 +263,7 @@ export default function AdminPatientsPage() {
             <Users className="h-6 w-6 text-primary" />
             Patient Management
           </h2>
-          <p className="text-muted-foreground mt-1">View and delete patient data records</p>
+          <p className="text-muted-foreground mt-1">View, manage login methods, and delete patient data records</p>
         </div>
         <div className="flex items-center gap-2">
           <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
@@ -282,6 +392,48 @@ export default function AdminPatientsPage() {
                       {patient.phone && <span>{patient.phone}</span>}
                       {(!patient.email && !patient.phone) && <span className="italic">No contact info</span>}
                     </div>
+
+                    {/* Auth Providers */}
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Shield className="h-3 w-3" />
+                        Login:
+                      </span>
+                      {(patient.authProviders || []).map(p => (
+                        <div key={p} className="flex items-center gap-1">
+                          {providerBadge(p)}
+                          {(patient.authProviders || []).length > 1 && (
+                            <button
+                              className="text-muted-foreground/50 hover:text-destructive transition-colors p-0.5"
+                              onClick={() => {
+                                setUnlinkConfirm({ patient, provider: p })
+                                setUnlinkConfirmText('')
+                              }}
+                              disabled={isUnlinking === `${patient.uid}-${p}`}
+                              title={`Unlink ${p}`}
+                            >
+                              {isUnlinking === `${patient.uid}-${p}` ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Unlink className="h-3 w-3" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      <button
+                        className="text-xs text-primary hover:text-primary/80 flex items-center gap-0.5 transition-colors"
+                        onClick={() => {
+                          setManagingPatient(patient)
+                          setIdentityError('')
+                          setLinkValue('')
+                        }}
+                      >
+                        <Plus className="h-3 w-3" />
+                        Link
+                      </button>
+                    </div>
+
                     <div className="flex flex-wrap items-center gap-2 mt-2">
                       <Badge variant="outline" className="gap-1 text-xs">
                         <Calendar className="h-3 w-3" />{patient.appointmentCount} Appointment{patient.appointmentCount !== 1 ? 's' : ''}
@@ -302,6 +454,7 @@ export default function AdminPatientsPage() {
                       setConfirmTarget(patient)
                       setDeleteOptions({ deleteAppointments: true, deleteChats: true, deleteCallbacks: true })
                       setResultMessage(null)
+                      setDeleteConfirmName('')
                     }}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -311,6 +464,135 @@ export default function AdminPatientsPage() {
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {/* Unlink Confirmation Modal */}
+      {unlinkConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-md border-destructive/50 shadow-2xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-destructive">
+                <Unlink className="h-5 w-5" />
+                Confirm Unlink
+              </CardTitle>
+              <CardDescription>
+                You are about to unlink <span className="font-semibold text-foreground">{unlinkConfirm.provider}</span> from patient <span className="font-semibold text-foreground">{unlinkConfirm.patient.name}</span>.
+                This will remove their ability to sign in using this method.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm">
+                  Type <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-destructive">{unlinkConfirm.provider}</span> to confirm
+                </Label>
+                <Input
+                  value={unlinkConfirmText}
+                  onChange={(e) => setUnlinkConfirmText(e.target.value)}
+                  placeholder={`Type ${unlinkConfirm.provider} here`}
+                  disabled={isUnlinking !== null}
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => { setUnlinkConfirm(null); setUnlinkConfirmText('') }}
+                  disabled={isUnlinking !== null}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="flex-1 gap-2"
+                  onClick={handleUnlinkIdentity}
+                  disabled={unlinkConfirmText.toLowerCase() !== unlinkConfirm.provider.toLowerCase() || isUnlinking !== null}
+                >
+                  {isUnlinking ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" /> Unlinking...</>
+                  ) : (
+                    <><Unlink className="h-4 w-4" /> Unlink</>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Link Identity Modal */}
+      {managingPatient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-md shadow-2xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Link2 className="h-5 w-5 text-primary" />
+                Link Login Method
+              </CardTitle>
+              <CardDescription>
+                Add a new login method for <span className="font-semibold text-foreground">{managingPatient.name}</span>
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleLinkIdentity} className="space-y-4">
+                {identityError && (
+                  <div className="p-3 text-sm text-red-500 bg-red-50 dark:bg-red-900/20 rounded-md border border-red-200 dark:border-red-800">
+                    {identityError}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label>Provider</Label>
+                  <div className="flex gap-2">
+                    <Button 
+                      type="button"
+                      variant={linkProvider === 'phone' ? 'default' : 'outline'} 
+                      onClick={() => setLinkProvider('phone')}
+                      className="flex-1 gap-2"
+                    >
+                      <Phone className="h-4 w-4" /> Phone
+                    </Button>
+                    <Button 
+                      type="button"
+                      variant={linkProvider === 'email' ? 'default' : 'outline'} 
+                      onClick={() => setLinkProvider('email')}
+                      className="flex-1 gap-2"
+                    >
+                      <Mail className="h-4 w-4" /> Email
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{linkProvider === 'phone' ? 'Phone Number' : 'Email Address'}</Label>
+                  <Input
+                    type={linkProvider === 'email' ? 'email' : 'tel'}
+                    placeholder={linkProvider === 'phone' ? '+91 9876543210' : 'john@example.com'}
+                    value={linkValue}
+                    onChange={e => setLinkValue(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    type="button"
+                    onClick={() => setManagingPatient(null)}
+                    disabled={isLinking}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="flex-1 gap-2" disabled={isLinking || !linkValue}>
+                    {isLinking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
+                    {isLinking ? 'Linking...' : 'Link'}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -324,7 +606,7 @@ export default function AdminPatientsPage() {
                 Confirm Deletion
               </CardTitle>
               <CardDescription>
-                Choose which data to permanently delete for <span className="font-semibold text-foreground">{confirmTarget.email}</span>.
+                Choose which data to permanently delete for <span className="font-semibold text-foreground">{confirmTarget.name}</span>.
                 This action <strong>cannot be undone</strong>.
               </CardDescription>
             </CardHeader>
@@ -350,11 +632,24 @@ export default function AdminPatientsPage() {
                 ))}
               </div>
 
+              {/* Type patient name to confirm */}
+              <div className="space-y-2">
+                <Label className="text-sm">
+                  Type <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-destructive">{confirmTarget.name}</span> to confirm
+                </Label>
+                <Input
+                  value={deleteConfirmName}
+                  onChange={(e) => setDeleteConfirmName(e.target.value)}
+                  placeholder="Type patient name here"
+                  disabled={deleting !== null}
+                />
+              </div>
+
               <div className="flex gap-3 pt-2">
                 <Button
                   variant="outline"
                   className="flex-1"
-                  onClick={() => setConfirmTarget(null)}
+                  onClick={() => { setConfirmTarget(null); setDeleteConfirmName('') }}
                   disabled={deleting !== null}
                 >
                   Cancel
@@ -363,7 +658,7 @@ export default function AdminPatientsPage() {
                   variant="destructive"
                   className="flex-1 gap-2"
                   onClick={handleDelete}
-                  disabled={deleting !== null}
+                  disabled={deleting !== null || deleteConfirmName.toLowerCase() !== confirmTarget.name.toLowerCase()}
                 >
                   {deleting ? (
                     <><Loader2 className="h-4 w-4 animate-spin" /> Deleting...</>

@@ -569,6 +569,66 @@ export async function deleteLabReport(id: string): Promise<void> {
   await db.collection('labReports').doc(id).delete()
 }
 
+// ── Identities (O(1) Identity Resolution) ─────────────────────────────────────
+
+export interface Identity {
+  provider: 'email' | 'phone' | 'google'
+  value: string
+  patientUid: string
+  linkedAt: string
+}
+
+/**
+ * O(1) lookup: resolve a provider+value to a patient UID.
+ * Document ID: `{provider}_{value}` e.g. "email_john@gmail.com"
+ */
+export async function resolveIdentity(provider: string, value: string): Promise<string | null> {
+  const docId = `${provider}_${value}`
+  const doc = await db.collection('identities').doc(docId).get()
+  if (!doc.exists) return null
+  return (doc.data() as Identity).patientUid
+}
+
+/**
+ * Link a new identity to a patient. Creates/overwrites the identity doc.
+ */
+export async function linkIdentity(provider: string, value: string, patientUid: string): Promise<void> {
+  const docId = `${provider}_${value}`
+  await db.collection('identities').doc(docId).set({
+    provider,
+    value,
+    patientUid,
+    linkedAt: new Date().toISOString(),
+  })
+}
+
+/**
+ * Get all identities linked to a patient UID.
+ */
+export async function getPatientIdentities(patientUid: string): Promise<Identity[]> {
+  const snap = await db.collection('identities').where('patientUid', '==', patientUid).get()
+  return snap.docs.map(d => d.data() as Identity)
+}
+
+/**
+ * Unlink a specific identity.
+ */
+export async function unlinkIdentity(provider: string, value: string): Promise<void> {
+  const docId = `${provider}_${value}`
+  await db.collection('identities').doc(docId).delete()
+}
+
+/**
+ * Delete ALL identity docs for a patient (used for account deletion).
+ */
+export async function deleteAllIdentities(patientUid: string): Promise<void> {
+  const snap = await db.collection('identities').where('patientUid', '==', patientUid).get()
+  if (snap.empty) return
+  const batch = db.batch()
+  snap.docs.forEach(doc => batch.delete(doc.ref))
+  await batch.commit()
+}
+
 // ── Patients ──────────────────────────────────────────────────────────────────
 
 export async function getPatientByUid(uid: string): Promise<Patient | null> {

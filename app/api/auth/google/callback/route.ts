@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { adminAuth } from '@/lib/firebase-admin'
-import { createOrUpdatePatient, getPatientByUid } from '@/lib/db'
+import { createOrUpdatePatient, getPatientByUid, resolveIdentity, linkIdentity } from '@/lib/db'
 
 export async function POST(request: Request) {
   try {
@@ -19,13 +19,43 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Google account must have an email' }, { status: 400 })
     }
 
-    // Check if the patient already exists in our database
+    // Check if the patient already exists in our database under this Google UID
     const existingPatient = await getPatientByUid(uid)
 
     if (!existingPatient) {
-      // New user
+      // ── Bridge: check if a patient with this email already exists ──────
+      // (e.g., registered via WhatsApp and linked their email)
+      const existingUid = await resolveIdentity('email', email.toLowerCase())
+      if (existingUid) {
+        const existingByEmail = await getPatientByUid(existingUid)
+        if (existingByEmail) {
+          // Delete the auto-created Google Auth user
+          try {
+            await adminAuth.deleteUser(uid)
+          } catch (e) {
+            console.error('Failed to delete auto-created Google Auth user:', e)
+          }
+
+          // Add Google as a linked identity + update patient
+          await linkIdentity('google', uid, existingUid)
+          await createOrUpdatePatient({
+            uid: existingUid,
+            authProviders: ['google'],
+            email: existingByEmail.email || email,
+          })
+
+          // Issue custom token for the ORIGINAL uid
+          const customToken = await adminAuth.createCustomToken(existingUid)
+          return NextResponse.json({
+            uid: existingUid,
+            patient: { ...existingByEmail, authProviders: [...new Set([...existingByEmail.authProviders, 'google'])] },
+            customToken,
+          })
+        }
+      }
+
+      // Truly new user — no existing patient anywhere
       if (!name) {
-        // We need a name for first-time login
         return NextResponse.json({ 
           error: 'Name is required for new users', 
           requiresName: true 
@@ -40,7 +70,11 @@ export async function POST(request: Request) {
         authProviders: ['google'],
       })
       
-      // Update Firebase Auth display name if we got one from the user
+      // Write identity docs for the new user
+      await linkIdentity('email', email.toLowerCase(), uid)
+      await linkIdentity('google', uid, uid)
+      
+      // Update Firebase Auth display name
       await adminAuth.updateUser(uid, { displayName: name })
 
       return NextResponse.json({ uid, patient })
@@ -50,8 +84,14 @@ export async function POST(request: Request) {
     const updatedPatient = await createOrUpdatePatient({
       uid,
       authProviders: ['google'],
-      email: existingPatient.email || email, // Set email if they didn't have one
+      email: existingPatient.email || email,
     })
+
+    // Ensure identity docs exist
+    await linkIdentity('google', uid, uid)
+    if (!existingPatient.email) {
+      await linkIdentity('email', email.toLowerCase(), uid)
+    }
 
     return NextResponse.json({ uid, patient: updatedPatient })
 
