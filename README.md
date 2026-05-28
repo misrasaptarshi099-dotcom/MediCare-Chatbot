@@ -88,7 +88,6 @@ WHATSAPP_VERIFY_TOKEN=your_custom_webhook_verify_token
 # Cron Scheduling & Security (Automated Appointment Reminders)
 # =========================================================================
 CRON_SECRET=your_shared_cron_api_secret
-NEXT_PUBLIC_CRON_SECRET=your_shared_cron_api_secret
 
 ```
 
