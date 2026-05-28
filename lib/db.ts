@@ -610,7 +610,8 @@ export async function linkIdentity(provider: string, value: string, patientUid: 
     if (doc.exists) {
       const existing = doc.data() as Identity
       if (existing.patientUid !== patientUid) {
-        throw new Error(`Identity ${docId} is already linked to another patient (UID: ${existing.patientUid})`)
+        console.debug(`[Identity Link Failure] Identity ${docId} is already linked to another patient (UID: ${existing.patientUid})`)
+        throw new Error('Identity is already linked to another patient')
       }
     }
     transaction.set(docRef, {
