@@ -5,7 +5,9 @@ import {
   getAllAppointments,
   getAllChatSessions,
   getCallbackTickets,
-  createOrUpdatePatient
+  createOrUpdatePatient,
+  linkIdentity,
+  deleteAllIdentities
 } from '@/lib/db'
 import { db } from '@/lib/firestore'
 import { adminAuth } from '@/lib/firebase-admin'
@@ -20,12 +22,17 @@ export async function GET() {
     const patientMap: Record<string, any> = {}
 
     for (const p of patients) {
+      // Self-heal: reconcile authProviders with actual data fields
+      const providers = [...(p.authProviders || [])]
+      if (p.phone && !providers.includes('phone')) providers.push('phone')
+      if (p.email && !providers.includes('email')) providers.push('email')
+
       patientMap[p.uid] = {
         uid: p.uid,
         email: p.email || '',
         phone: p.phone || '',
         name: p.name || 'Unknown',
-        authProviders: p.authProviders || [],
+        authProviders: providers,
         appointmentCount: 0,
         callbackCount: 0,
         chatCount: 0,
@@ -142,6 +149,14 @@ export async function DELETE(request: Request) {
     }
   }
 
+  // Delete identity docs
+  try {
+    await deleteAllIdentities(uid)
+    results.push('Deleted identity records')
+  } catch (err) {
+    console.error('Failed to delete identity docs:', err)
+  }
+
   // Delete the actual patient account and Firebase Auth user
   try {
     // 1. Delete from Firestore patients collection
@@ -185,6 +200,9 @@ export async function POST(request: Request) {
 
     let uid: string
     let normalizedIdentifier = contactValue.trim()
+    if (contactType === 'email') {
+      normalizedIdentifier = normalizedIdentifier.toLowerCase()
+    }
 
     const newUserParams: any = { displayName: name }
 
@@ -226,6 +244,9 @@ export async function POST(request: Request) {
     else patientData.email = normalizedIdentifier
 
     const patient = await createOrUpdatePatient(patientData)
+
+    // Write identity doc for O(1) lookup
+    await linkIdentity(contactType, normalizedIdentifier, uid)
 
     return NextResponse.json({ success: true, patient })
   } catch (err: any) {

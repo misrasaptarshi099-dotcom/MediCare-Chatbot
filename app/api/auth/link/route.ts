@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { adminAuth } from '@/lib/firebase-admin'
-import { linkAuthProvider } from '@/lib/db'
+import { linkAuthProvider, linkIdentity } from '@/lib/db'
 
 export async function POST(request: Request) {
   try {
@@ -40,6 +40,9 @@ export async function POST(request: Request) {
       // Update Patient doc in Firestore
       const patient = await linkAuthProvider(uid, 'phone', normalizedPhone)
       
+      // Write identity doc for O(1) lookup
+      await linkIdentity('phone', normalizedPhone, uid)
+      
       return NextResponse.json({ success: true, patient })
 
     } else if (action === 'link_email') {
@@ -50,6 +53,9 @@ export async function POST(request: Request) {
       
       // Update Patient doc in Firestore
       const patient = await linkAuthProvider(uid, 'email', normalizedEmail)
+      
+      // Write identity doc for O(1) lookup
+      await linkIdentity('email', normalizedEmail, uid)
       
       return NextResponse.json({ success: true, patient })
     }

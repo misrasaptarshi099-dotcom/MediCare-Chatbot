@@ -121,6 +121,12 @@ export function LoginForm() {
         throw new Error(data.error || 'Google sign-in failed.')
       }
 
+      // If backend returned a custom token, the user was bridged to an existing account
+      if (data.customToken) {
+        await auth.signOut() // sign out the auto-created Google user
+        await signInWithCustomToken(auth, data.customToken)
+      }
+
       router.push('/patient')
     } catch (err: any) {
       setError(err.message || 'An error occurred during Google sign-in')

@@ -99,7 +99,7 @@ export async function processAiMessage(from: string, input: string, session: WaS
 
   const listLabReportsFunc: FunctionDeclaration = {
     name: 'list_lab_reports',
-    description: 'Lists the patient\'s available lab reports and diagnostic results. Returns report IDs, names, dates, and types. Call this first so the patient can choose which report to receive.',
+    description: 'Lists the patient\'s available lab reports and diagnostic results. Returns reports with IDs, names, dates, types, and ordinal numbers (1, 2, 3...). Call this first so the patient can choose which report to receive.',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {}
@@ -108,11 +108,11 @@ export async function processAiMessage(from: string, input: string, session: WaS
 
   const sendLabReportFunc: FunctionDeclaration = {
     name: 'send_lab_report',
-    description: 'Sends a specific lab report PDF file directly to the patient on WhatsApp. The patient receives the actual document file, not a link. Use a reportId obtained from list_lab_reports.',
+    description: 'Sends a specific lab report PDF file directly to the patient on WhatsApp. The patient receives the actual document file, not a link. Use the reportId or the ordinal number (e.g. "1", "2") obtained from list_lab_reports.',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
-        reportId: { type: SchemaType.STRING, description: 'The ID of the lab report to send' }
+        reportId: { type: SchemaType.STRING, description: 'The ID or ordinal number (e.g. "1") of the lab report to send' }
       },
       required: ['reportId']
     }
@@ -352,30 +352,39 @@ export async function processAiMessage(from: string, input: string, session: WaS
               if (deliverable.length === 0) {
                 functionResponse = { reports: [], message: 'No downloadable lab reports are available yet.' }
               } else {
-                functionResponse = {
-                  reports: deliverable.map(r => {
-                    const d = r.createdAt ? new Date(r.createdAt) : null
-                    const dateStr = d && !isNaN(d.getTime()) ? d.toLocaleDateString('en-IN') : 'N/A'
-                    return {
-                      id: r.id,
-                      testName: r.testName,
-                      reportType: r.reportType,
-                      date: dateStr,
-                      status: r.status
-                    }
-                  })
-                }
+                const reportMap: Record<string, string> = {}
+                const reportsData = deliverable.map((r, idx) => {
+                  const d = r.createdAt ? new Date(r.createdAt) : null
+                  const dateStr = d && !isNaN(d.getTime()) ? d.toLocaleDateString('en-IN') : 'N/A'
+                  const ordinal = String(idx + 1)
+                  reportMap[ordinal] = r.id
+                  return {
+                    id: r.id,
+                    ordinal,
+                    testName: r.testName,
+                    reportType: r.reportType,
+                    date: dateStr,
+                    status: r.status
+                  }
+                })
+                session.data.reportMap = reportMap
+                await setWaSession(from, { data: session.data })
+                functionResponse = { reports: reportsData }
               }
             }
           }
         }
         else if (call.name === 'send_lab_report') {
-          const { reportId } = call.args as any
+          let { reportId } = call.args as any
           if (!session.patientUid) {
             functionResponse = { error: 'Patient profile not linked. Cannot send reports.' }
           } else if (!reportId) {
             functionResponse = { error: 'No reportId provided. Call list_lab_reports first.' }
           } else {
+            const reportIdStr = String(reportId).trim()
+            if (session.data.reportMap && session.data.reportMap[reportIdStr]) {
+              reportId = session.data.reportMap[reportIdStr]
+            }
             const report = await getLabReport(reportId)
             if (!report) {
               functionResponse = { error: 'Report not found.' }

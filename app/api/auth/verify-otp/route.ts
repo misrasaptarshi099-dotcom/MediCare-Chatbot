@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getOtp, deleteOtp, createOrUpdatePatient, getPatientByIdentifier } from '@/lib/db'
+import { getOtp, deleteOtp, createOrUpdatePatient, getPatientByUid, resolveIdentity, linkIdentity } from '@/lib/db'
 import { adminAuth } from '@/lib/firebase-admin'
 
 export async function POST(request: Request) {
@@ -12,6 +12,9 @@ export async function POST(request: Request) {
 
     let normalizedIdentifier = identifier.trim()
     const isPhone = /^\+?[0-9]{10,15}$/.test(normalizedIdentifier)
+    if (!isPhone) {
+      normalizedIdentifier = normalizedIdentifier.toLowerCase()
+    }
 
     // Ensure phone numbers have a country code (default to +91 for India if missing)
     if (isPhone && !normalizedIdentifier.startsWith('+')) {
@@ -57,16 +60,20 @@ export async function POST(request: Request) {
       userExists = false
     }
 
-    // ── Bridge WhatsApp auto-registered patients ──────────────────────────
+    // ── Bridge existing patients (WhatsApp or other) ──────────────────────
     // If Firebase Auth doesn't know this user, check if they were already
-    // auto-registered via WhatsApp (Firestore patient record exists).
+    // registered (Firestore identity/patient record exists).
     let existingPatientName: string | undefined
     let existingPatientUid: string | undefined
-    if (!userExists && isPhone) {
-      const existing = await getPatientByIdentifier(normalizedIdentifier)
-      if (existing) {
-        existingPatientName = existing.name || 'WhatsApp User'
-        existingPatientUid = existing.uid
+    if (!userExists) {
+      const providerType = isPhone ? 'phone' : 'email'
+      const resolvedUid = await resolveIdentity(providerType, normalizedIdentifier)
+      if (resolvedUid) {
+        const existing = await getPatientByUid(resolvedUid)
+        if (existing) {
+          existingPatientName = existing.name || 'WhatsApp User'
+          existingPatientUid = existing.uid
+        }
       }
     }
 
@@ -113,6 +120,10 @@ export async function POST(request: Request) {
     else patientData.email = normalizedIdentifier
 
     const patient = await createOrUpdatePatient(patientData)
+
+    // Write identity doc for O(1) lookup
+    const providerType = isPhone ? 'phone' : 'email'
+    await linkIdentity(providerType, normalizedIdentifier, uid)
 
     const customToken = await adminAuth.createCustomToken(uid)
     return NextResponse.json({ customToken, uid, patient })

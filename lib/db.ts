@@ -1,5 +1,6 @@
 import { db } from './firestore'
-import { FieldValue } from 'firebase-admin/firestore'// ── Interfaces ────────────────────────────────────────────────────────────────
+
+// ── Interfaces ────────────────────────────────────────────────────────────────
 
 export interface Doctor {
   id: string
@@ -235,6 +236,11 @@ export async function getAllAppointments(): Promise<Appointment[]> {
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment))
 }
 
+export async function getAppointmentsByPatientUid(patientUid: string): Promise<Appointment[]> {
+  const snap = await db.collection('appointments').where('patientUid', '==', patientUid).get()
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment))
+}
+
 export async function getAppointment(id: string): Promise<Appointment | null> {
   const doc = await db.collection('appointments').doc(id).get()
   if (!doc.exists) return null
@@ -453,6 +459,11 @@ export async function getCallbackTickets(): Promise<CallbackTicket[]> {
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as CallbackTicket))
 }
 
+export async function getCallbackTicketsByPatientUid(patientUid: string): Promise<CallbackTicket[]> {
+  const snap = await db.collection('callbackTickets').where('patientUid', '==', patientUid).get()
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as CallbackTicket))
+}
+
 export async function addCallbackTicket(ticket: CallbackTicket): Promise<void> {
   await db.collection('callbackTickets').doc(ticket.id).set(ticket)
 }
@@ -567,6 +578,91 @@ export async function updateLabReport(id: string, updates: Partial<LabReport>): 
 
 export async function deleteLabReport(id: string): Promise<void> {
   await db.collection('labReports').doc(id).delete()
+}
+
+// ── Identities (O(1) Identity Resolution) ─────────────────────────────────────
+
+export interface Identity {
+  provider: 'email' | 'phone' | 'google'
+  value: string
+  patientUid: string
+  linkedAt: string
+}
+
+function normalizeIdentityValue(provider: string, value: string): string {
+  if (provider === 'email') return value.toLowerCase().trim()
+  return value.trim()
+}
+
+/**
+ * O(1) lookup: resolve a provider+value to a patient UID.
+ * Document ID: `{provider}_{value}` e.g. "email_john@gmail.com"
+ */
+export async function resolveIdentity(provider: string, value: string): Promise<string | null> {
+  const docId = `${provider}_${normalizeIdentityValue(provider, value)}`
+  const doc = await db.collection('identities').doc(docId).get()
+  if (!doc.exists) return null
+  return (doc.data() as Identity).patientUid
+}
+
+/**
+ * Link a new identity to a patient.
+ * Creates the identity doc if new, or silently succeeds if already owned by `patientUid`.
+ * Throws if the identity is already linked to a DIFFERENT patient.
+ */
+export async function linkIdentity(provider: string, value: string, patientUid: string): Promise<void> {
+  const normalized = normalizeIdentityValue(provider, value)
+  const docId = `${provider}_${normalized}`
+  const docRef = db.collection('identities').doc(docId)
+  await db.runTransaction(async (transaction) => {
+    const doc = await transaction.get(docRef)
+    let originalLinkedAt: string | null = null
+    if (doc.exists) {
+      const existing = doc.data() as Identity
+      if (existing.patientUid !== patientUid) {
+        console.debug(`[Identity Link Failure] Identity ${docId} is already linked to another patient`)
+        throw new Error('Identity is already linked to another patient')
+      }
+      originalLinkedAt = existing.linkedAt
+    }
+    transaction.set(docRef, {
+      provider,
+      value: normalized,
+      patientUid,
+      linkedAt: originalLinkedAt || new Date().toISOString(),
+    })
+  })
+}
+
+/**
+ * Get all identities linked to a patient UID.
+ */
+export async function getPatientIdentities(patientUid: string): Promise<Identity[]> {
+  const snap = await db.collection('identities').where('patientUid', '==', patientUid).get()
+  return snap.docs.map(d => d.data() as Identity)
+}
+
+/**
+ * Unlink a specific identity.
+ */
+export async function unlinkIdentity(provider: string, value: string): Promise<void> {
+  const docId = `${provider}_${normalizeIdentityValue(provider, value)}`
+  await db.collection('identities').doc(docId).delete()
+}
+
+/**
+ * Delete ALL identity docs for a patient (used for account deletion).
+ */
+export async function deleteAllIdentities(patientUid: string): Promise<void> {
+  const snap = await db.collection('identities').where('patientUid', '==', patientUid).get()
+  if (snap.empty) return
+  const BATCH_SIZE = 500
+  const docs = snap.docs
+  for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+    const batch = db.batch()
+    docs.slice(i, i + BATCH_SIZE).forEach(doc => batch.delete(doc.ref))
+    await batch.commit()
+  }
 }
 
 // ── Patients ──────────────────────────────────────────────────────────────────
