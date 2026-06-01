@@ -245,6 +245,26 @@ function CallbackCard({ cb, index }: { cb: any; index: number }) {
 
 // ── Report card ─────────────────────────────────────────────────────────────
 function ReportCard({ report, index, uid }: { report: any; index: number; uid: string }) {
+  const [isDownloading, setIsDownloading] = useState(false)
+
+  const handleDownload = async () => {
+    try {
+      setIsDownloading(true)
+      const token = await auth.currentUser?.getIdToken()
+      if (!token) {
+        alert('You must be logged in to download reports.')
+        return
+      }
+      const url = `/api/reports/download?reportId=${encodeURIComponent(report.id)}&token=${encodeURIComponent(token)}`
+      window.open(url, '_blank')
+    } catch (err) {
+      console.error('Download failed', err)
+      alert('Failed to initiate download.')
+    } finally {
+      setIsDownloading(false)
+    }
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16, scale: 0.97 }}
@@ -277,14 +297,17 @@ function ReportCard({ report, index, uid }: { report: any; index: number; uid: s
         }`}>
           {report.status === 'sent' || report.status === 'ready' ? '✓ Ready' : '⏳ Processing'}
         </Badge>
-        <Button size="sm" variant="outline" className="gap-2" asChild>
-          <a
-            href={`/api/reports/download?reportId=${encodeURIComponent(report.id)}&uid=${encodeURIComponent(uid)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Download className="h-3.5 w-3.5" /> Download PDF
-          </a>
+        <Button size="sm" variant="outline" className="gap-2" onClick={handleDownload} disabled={isDownloading}>
+          {isDownloading ? (
+            <span className="flex items-center gap-1">
+              <div className="h-3 w-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
+              Opening...
+            </span>
+          ) : (
+            <>
+              <Download className="h-3.5 w-3.5" /> Download PDF
+            </>
+          )}
         </Button>
       </div>
     </motion.div>

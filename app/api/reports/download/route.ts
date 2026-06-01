@@ -24,7 +24,7 @@ async function isAdminAuthenticated(): Promise<boolean> {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const reportId = searchParams.get('reportId')
-  const uid = searchParams.get('uid')
+  const token = searchParams.get('token')
 
   if (!reportId) {
     return NextResponse.json({ error: 'reportId is required' }, { status: 400 })
@@ -37,7 +37,19 @@ export async function GET(request: Request) {
     }
 
     const isAdmin = await isAdminAuthenticated()
-    const isPatientMatch = !!uid && uid === report.patientUid
+    
+    let patientUid = ''
+    if (token) {
+      try {
+        const { adminAuth } = await import('@/lib/firebase-admin')
+        const decodedToken = await adminAuth.verifyIdToken(token)
+        patientUid = decodedToken.uid
+      } catch (err) {
+        console.error('Invalid patient token:', err)
+      }
+    }
+
+    const isPatientMatch = !!patientUid && patientUid === report.patientUid
     if (!isAdmin && !isPatientMatch) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
