@@ -57,12 +57,15 @@ export const appointmentSchema = z.object({
     .max(20, 'Phone number is too long')
     .optional()
     .default(''),
-  patientEmail: z
-    .string()
-    .email('Invalid email format')
-    .max(254)
-    .optional()
-    .default(''),
+  patientEmail: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z
+      .string()
+      .email('Invalid email format')
+      .max(254)
+      .optional()
+      .default('')
+  ),
   patientUid: z.string().max(128).optional(),
   doctorId: z.string().max(100).optional(),
   doctorName: z

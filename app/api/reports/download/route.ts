@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { getAdminUsers, getLabReport } from '@/lib/db'
+import { getLabReport } from '@/lib/db'
 import { storage } from '@/lib/firestore'
 
 async function isAdminAuthenticated(): Promise<boolean> {
@@ -50,7 +50,7 @@ export async function GET(request: Request) {
       const [signedUrl] = await file.getSignedUrl({
         action: 'read',
         expires: Date.now() + 5 * 60 * 1000, // 5-minute expiry
-        responseDisposition: `attachment; filename="${(report.fileName || 'report.pdf').replace(/["\\\n]/g, '_')}"`,
+        responseDisposition: `attachment; filename="${(report.fileName || 'report.pdf').replace(/["\\\n\r]/g, '_')}"`,
         responseType: 'application/pdf',
       })
 
@@ -64,7 +64,7 @@ export async function GET(request: Request) {
     }
     const fileBuffer = Buffer.from(await response.arrayBuffer())
 
-    const safe = (report.fileName || 'report.pdf').replace(/["\\\n]/g, '_')
+    const safe = (report.fileName || 'report.pdf').replace(/["\\\n\r]/g, '_')
     return new NextResponse(fileBuffer, {
       status: 200,
       headers: {

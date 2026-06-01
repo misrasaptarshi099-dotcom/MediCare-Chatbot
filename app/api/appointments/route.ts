@@ -7,7 +7,7 @@ import {
   type Doctor,
 } from '@/lib/db'
 import { checkRateLimit, rateLimitKey, getClientIp } from '@/lib/rate-limit'
-import { appointmentSchema, validateInput, sanitizeHtml } from '@/lib/sanitize'
+import { appointmentSchema, validateInput } from '@/lib/sanitize'
 
 function normalizeToHHMM(value: string): string {
   const trimmed = value.trim()

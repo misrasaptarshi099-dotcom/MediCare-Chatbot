@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
+import crypto from 'crypto'
 import { saveOtp } from '@/lib/db'
 import { checkRateLimit, rateLimitKey, getClientIp } from '@/lib/rate-limit'
 import { patientOtpSchema, validateInput } from '@/lib/sanitize'
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
   }
 
   // Generate a secure 6-digit OTP
-  const code = String(Math.floor(100000 + Math.random() * 900000))
+  const code = String(crypto.randomInt(100000, 1000000))
   const expiresAt = Date.now() + OTP_TTL_MS
 
   // Persist the OTP in Firestore

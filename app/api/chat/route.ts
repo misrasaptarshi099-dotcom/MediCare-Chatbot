@@ -13,7 +13,7 @@ import {
   type ChatMessage as DbChatMessage,
 } from '@/lib/db'
 import { checkRateLimit, rateLimitKey, getClientIp } from '@/lib/rate-limit'
-import { chatMessageSchema, validateInput, sanitizeHtml } from '@/lib/sanitize'
+import { validateInput, sanitizeHtml } from '@/lib/sanitize'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? '')
 const MODEL = process.env.GEMINI_MODEL ?? 'gemini-3.1-flash-lite'
@@ -352,7 +352,7 @@ export async function POST(request: Request) {
           const existingMessages = existing?.messages ?? []
           const timestamp = Date.now()
           const newMsgs: DbChatMessage[] = [
-            { id: `u-${timestamp}`, type: 'user', content: query, timestamp },
+            { id: `u-${timestamp}`, type: 'user', content: sanitizedQuery, timestamp },
             { id: `a-${timestamp}`, type: 'assistant', content: responseMessage, timestamp }
           ]
           await appendChatMessages(effectiveUid, newMsgs, new Date().toISOString())
@@ -418,7 +418,7 @@ export async function POST(request: Request) {
 
     // Log escalated queries for admin review
     if (parsed.needsEscalation) {
-      await logUnansweredQuery(query, parsed.escalationReason ?? 'Escalated by AI')
+      await logUnansweredQuery(sanitizedQuery, parsed.escalationReason ?? 'Escalated by AI')
     }
 
     // Persist chat history if a UID is provided
@@ -428,7 +428,7 @@ export async function POST(request: Request) {
         const existingMessages = existing?.messages ?? []
 
         const timestamp = Date.now()
-        const userMsg: DbChatMessage = { id: `u-${timestamp}`, type: 'user', content: query, timestamp }
+        const userMsg: DbChatMessage = { id: `u-${timestamp}`, type: 'user', content: sanitizedQuery, timestamp }
         const aiMsg: DbChatMessage = { id: `a-${timestamp}`, type: 'assistant', content: parsed.message, timestamp }
 
         await appendChatMessages(effectiveUid, [userMsg, aiMsg], new Date().toISOString())

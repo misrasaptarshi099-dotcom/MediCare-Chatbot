@@ -49,6 +49,10 @@ export function checkRateLimit(
   limit: number,
   windowMs: number
 ): RateLimitResult {
+  if (limit <= 0 || windowMs <= 0) {
+    return { allowed: false, remaining: 0, resetAt: Date.now() }
+  }
+
   callsSincePrune++
   if (callsSincePrune >= PRUNE_INTERVAL) {
     pruneExpired()
