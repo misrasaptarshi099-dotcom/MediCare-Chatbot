@@ -12,9 +12,10 @@
  */
 
 import { NextResponse } from 'next/server'
-import { verifyWhatsAppSignature, markAsRead } from '@/lib/whatsapp'
+import { verifyWhatsAppSignature, markAsRead, sendTextMessage } from '@/lib/whatsapp'
 import { handleWhatsAppMessage, type IncomingMessage } from '@/lib/wa-flows'
 import { db } from '@/lib/firestore'
+import { checkRateLimit, rateLimitKey } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
@@ -160,6 +161,26 @@ export async function POST(request: Request) {
 
       // Mark as read (blue ticks) — fire and forget
       markAsRead(message.id).catch(() => {})
+
+      // ── RATE LIMITING: 30 total messages per day per phone number ───────
+      const totalCheck = checkRateLimit(rateLimitKey('wa-total-day', incoming.from), 30, 24 * 60 * 60 * 1000)
+      if (!totalCheck.allowed) {
+        try {
+          await sendTextMessage(incoming.from, '⚠️ You have reached your daily message limit. Please try again tomorrow.')
+        } catch {}
+        continue
+      }
+
+      // ── RATE LIMITING: 15 AI agent messages per day per phone number ────
+      if (incoming.type === 'text') {
+        const aiCheck = checkRateLimit(rateLimitKey('wa-ai-day', incoming.from), 15, 24 * 60 * 60 * 1000)
+        if (!aiCheck.allowed) {
+          try {
+            await sendTextMessage(incoming.from, '⚠️ You have used all your AI assistant interactions for today. Please try again tomorrow, or call the hospital directly for assistance.')
+          } catch {}
+          continue
+        }
+      }
 
       // Route through the conversation state machine
       try {

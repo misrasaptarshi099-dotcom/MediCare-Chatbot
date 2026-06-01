@@ -10,17 +10,31 @@ import {
   type UnansweredQuery,
   type CallbackTicket,
 } from '@/lib/db'
+import { checkRateLimit, rateLimitKey, getClientIp } from '@/lib/rate-limit'
+import { sanitizeHtml } from '@/lib/sanitize'
 
 export async function POST(request: Request) {
   const adminUser = await requireAdminSession();
   if (!adminUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
+    const ip = getClientIp(request)
+
+    // Rate limit: 3 escalation actions per day per IP
+    const check = checkRateLimit(rateLimitKey('escalation-day', ip), 3, 24 * 60 * 60 * 1000)
+    if (!check.allowed) {
+      return NextResponse.json(
+        { error: 'Too many escalation requests today. Please try again tomorrow.' },
+        { status: 429 }
+      )
+    }
+
     const body = await request.json()
     const { action, ...data } = body
 
     if (action === 'log_unanswered') {
-      const { query, reason } = data
+      const query = typeof data.query === 'string' ? sanitizeHtml(data.query.slice(0, 500)) : ''
+      const reason = typeof data.reason === 'string' ? sanitizeHtml(data.reason.slice(0, 500)) : ''
 
       if (!query || !reason) {
         return NextResponse.json({ error: 'Query and reason are required' }, { status: 400 })
@@ -39,7 +53,11 @@ export async function POST(request: Request) {
     }
 
     if (action === 'create_callback') {
-      const { patientName, patientPhone, patientEmail, querySummary, department } = data
+      const patientName = typeof data.patientName === 'string' ? sanitizeHtml(data.patientName.slice(0, 100)) : ''
+      const patientPhone = typeof data.patientPhone === 'string' ? data.patientPhone.slice(0, 20) : ''
+      const patientEmail = typeof data.patientEmail === 'string' ? data.patientEmail.slice(0, 254) : ''
+      const querySummary = typeof data.querySummary === 'string' ? sanitizeHtml(data.querySummary.slice(0, 500)) : ''
+      const department = typeof data.department === 'string' ? sanitizeHtml(data.department.slice(0, 100)) : 'General'
 
       if (!patientName || !patientPhone || !querySummary) {
         return NextResponse.json({ error: 'Patient details and query summary are required' }, { status: 400 })

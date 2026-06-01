@@ -6,6 +6,8 @@ import {
   type Appointment,
   type Doctor,
 } from '@/lib/db'
+import { checkRateLimit, rateLimitKey, getClientIp } from '@/lib/rate-limit'
+import { appointmentSchema, validateInput, sanitizeHtml } from '@/lib/sanitize'
 
 function normalizeToHHMM(value: string): string {
   const trimmed = value.trim()
@@ -107,10 +109,22 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { patientName, patientPhone, patientEmail, patientUid, doctorId, date, time, service, paymentStatus, amount } = body
 
-    if (!patientName || (!patientPhone && !patientEmail && !patientUid) || (!doctorId && !body.doctorName) || !date || !time) {
-      return NextResponse.json({ error: 'Missing required fields. Please provide at least a phone number or email.' }, { status: 400 })
+    // Input validation
+    const validation = validateInput(appointmentSchema, body)
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 })
+    }
+    const { patientName, patientPhone, patientEmail, patientUid, doctorId, date, time, service, paymentStatus, amount } = validation.data
+
+    // Rate limit: 3 bookings per day per IP/UID
+    const rateLimitId = patientUid || getClientIp(request)
+    const bookingCheck = checkRateLimit(rateLimitKey('booking-day', rateLimitId), 3, 24 * 60 * 60 * 1000)
+    if (!bookingCheck.allowed) {
+      return NextResponse.json(
+        { error: 'You have reached the maximum number of bookings for today. Please try again tomorrow.' },
+        { status: 429 }
+      )
     }
 
     const doctors = await getDoctors()
@@ -118,10 +132,10 @@ export async function POST(request: Request) {
 
     // Try finding by ID first, fallback to name (case-insensitive)
     let doctor = doctors.find(d => d.id === doctorId)
-    if (!doctor && body.doctorName) {
+    if (!doctor && validation.data.doctorName) {
       doctor = doctors.find(d => 
-        d.name.toLowerCase() === body.doctorName.toLowerCase() || 
-        d.name.toLowerCase().includes(body.doctorName.toLowerCase())
+        d.name.toLowerCase() === validation.data.doctorName!.toLowerCase() || 
+        d.name.toLowerCase().includes(validation.data.doctorName!.toLowerCase())
       )
     }
 

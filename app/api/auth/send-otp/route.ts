@@ -1,17 +1,32 @@
 import { NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
 import { saveOtp } from '@/lib/db'
+import { checkRateLimit, rateLimitKey, getClientIp } from '@/lib/rate-limit'
+import { patientOtpSchema, validateInput } from '@/lib/sanitize'
 
 const OTP_TTL_MS = 10 * 60 * 1000 // 10 minutes
 
 export async function POST(request: Request) {
-  const { identifier } = await request.json()
+  const ip = getClientIp(request)
 
-  if (!identifier || typeof identifier !== 'string') {
-    return NextResponse.json({ error: 'Identifier (email or phone) is required' }, { status: 400 })
+  // Rate limit: 5 OTPs per hour per IP
+  const ipCheck = checkRateLimit(rateLimitKey('patient-otp-ip', ip), 5, 60 * 60 * 1000)
+  if (!ipCheck.allowed) {
+    return NextResponse.json(
+      { error: 'Too many OTP requests. Please try again later.' },
+      { status: 429 }
+    )
   }
 
-  let normalizedIdentifier = identifier.trim()
+  const body = await request.json()
+
+  // Input validation
+  const validation = validateInput(patientOtpSchema, body)
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 })
+  }
+
+  let normalizedIdentifier = validation.data.identifier.trim()
   const isPhone = /^\+?[0-9]{10,15}$/.test(normalizedIdentifier)
 
   // Ensure phone numbers have a country code (default to +91 for India if missing)
@@ -21,6 +36,15 @@ export async function POST(request: Request) {
     } else {
       normalizedIdentifier = '+' + normalizedIdentifier
     }
+  }
+
+  // Rate limit: 5 OTPs per hour per identifier
+  const idCheck = checkRateLimit(rateLimitKey('patient-otp-id', normalizedIdentifier), 5, 60 * 60 * 1000)
+  if (!idCheck.allowed) {
+    return NextResponse.json(
+      { error: 'Too many OTP requests for this identifier. Please try again later.' },
+      { status: 429 }
+    )
   }
 
   // Generate a secure 6-digit OTP
@@ -75,3 +99,4 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ success: true })
 }
+

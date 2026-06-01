@@ -340,6 +340,21 @@ export async function getAdminUser(id: string): Promise<User | null> {
   return doc.exists ? ({ id: doc.id, ...doc.data() } as User) : null
 }
 
+export async function getAdminUserByUsername(username: string): Promise<User | null> {
+  const snap = await db.collection('adminUsers').where('username', '==', username).limit(1).get()
+  if (snap.empty) return null
+  const doc = snap.docs[0]
+  return { id: doc.id, ...doc.data() } as User
+}
+
+export async function getAdminUserByEmail(email: string): Promise<User | null> {
+  const normalizedEmail = email.toLowerCase().trim()
+  const snap = await db.collection('adminUsers').where('email', '==', normalizedEmail).limit(1).get()
+  if (snap.empty) return null
+  const doc = snap.docs[0]
+  return { id: doc.id, ...doc.data() } as User
+}
+
 // ── OTPs ──────────────────────────────────────────────────────────────────────
 
 export async function saveOtp(identifier: string, code: string, expiresAt: number, purpose: string = 'patient'): Promise<void> {
@@ -488,7 +503,19 @@ export async function markReminderSent(appointmentId: string): Promise<void> {
 
 // ── Build Hospital Context (for AI prompt) ────────────────────────────────────
 
+// 5-minute in-memory TTL cache for the hospital context string.
+// This data (doctors, departments, services, insurance) is public catalog data
+// that changes rarely, so caching it prevents 100+ Firestore reads per chat message.
+let _cachedHospitalContext: string | null = null
+let _hospitalContextExpiresAt = 0
+const HOSPITAL_CONTEXT_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
 export async function buildHospitalContext(): Promise<string> {
+  const now = Date.now()
+  if (_cachedHospitalContext && now < _hospitalContextExpiresAt) {
+    return _cachedHospitalContext
+  }
+
   const [doctors, departments, visitingHours, insurancePartners, services] = await Promise.all([
     getDoctors(),
     getDepartments(),
@@ -526,7 +553,7 @@ export async function buildHospitalContext(): Promise<string> {
     `- ${s.name} (id: ${s.id}) | ${s.department} | Duration: ${s.duration} min | Base price: ₹${s.basePrice}`
   ).join('\n')
 
-  return `
+  const context = `
 TODAY: ${dayName}, ${dateStr}
 
 === DOCTORS & AVAILABILITY ===
@@ -544,6 +571,11 @@ ${insLines}
 === SERVICES & PRICING ===
 ${svcLines}
 `.trim()
+
+  _cachedHospitalContext = context
+  _hospitalContextExpiresAt = Date.now() + HOSPITAL_CONTEXT_TTL_MS
+
+  return context
 }
 
 // ── Lab Reports ───────────────────────────────────────────────────────────────

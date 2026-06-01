@@ -1,19 +1,45 @@
 import { NextResponse } from 'next/server'
-import { getAdminUsers, type User } from '@/lib/db'
+import { getAdminUserByUsername } from '@/lib/db'
 import { cookies } from 'next/headers'
 import bcrypt from 'bcryptjs'
 import { createAdminSession, requireAdminSession, deleteAdminSession } from '@/lib/admin-auth'
+import { checkRateLimit, rateLimitKey, getClientIp } from '@/lib/rate-limit'
+import { adminLoginSchema, validateInput } from '@/lib/sanitize'
 
 export async function POST(request: Request) {
   try {
-    const { username, password } = await request.json()
+    const ip = getClientIp(request)
 
-    if (!username || !password) {
-      return NextResponse.json({ error: 'Username and password are required' }, { status: 400 })
+    // Rate limit: 5 failed attempts per 15 minutes
+    const shortKey = rateLimitKey('login-short', ip)
+    const shortCheck = checkRateLimit(shortKey, 5, 15 * 60 * 1000)
+    if (!shortCheck.allowed) {
+      return NextResponse.json(
+        { error: 'Too many login attempts. Please try again in 15 minutes.' },
+        { status: 429 }
+      )
     }
 
-    const users = await getAdminUsers()
-    const user = users.find(u => u.username === username)
+    // Rate limit: 10 failed attempts per day
+    const dailyKey = rateLimitKey('login-daily', ip)
+    const dailyCheck = checkRateLimit(dailyKey, 10, 24 * 60 * 60 * 1000)
+    if (!dailyCheck.allowed) {
+      return NextResponse.json(
+        { error: 'Too many login attempts today. Please try again tomorrow.' },
+        { status: 429 }
+      )
+    }
+
+    const body = await request.json()
+
+    // Input validation
+    const validation = validateInput(adminLoginSchema, body)
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 })
+    }
+    const { username, password } = validation.data
+
+    const user = await getAdminUserByUsername(username)
 
     if (!user) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
@@ -93,3 +119,4 @@ export async function DELETE() {
     return NextResponse.json({ error: 'Logout failed' }, { status: 500 })
   }
 }
+
