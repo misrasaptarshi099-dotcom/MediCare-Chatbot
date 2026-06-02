@@ -248,10 +248,13 @@ function ReportCard({ report, index, uid }: { report: any; index: number; uid: s
   const [isDownloading, setIsDownloading] = useState(false)
 
   const handleDownload = async () => {
+    // Open tab synchronously to preserve user-gesture context (avoids popup blockers)
+    const newWin = window.open('', '_blank')
     try {
       setIsDownloading(true)
       const token = await auth.currentUser?.getIdToken()
       if (!token) {
+        newWin?.close()
         alert('You must be logged in to download reports.')
         return
       }
@@ -266,27 +269,24 @@ function ReportCard({ report, index, uid }: { report: any; index: number; uid: s
       })
 
       if (!res.ok) {
+        newWin?.close()
         const err = await res.json().catch(() => ({ error: 'Download failed' }))
         alert(err.error || 'Failed to download report.')
         return
       }
 
-      // If the response is JSON with a signed URL, navigate to it
+      // If the response is JSON with a signed URL, navigate the opened tab to it
       const contentType = res.headers.get('Content-Type') || ''
       if (contentType.includes('application/json')) {
         const { url } = await res.json()
-        if (url) {
-          // Use a temporary anchor to trigger the download without popup blockers
-          const a = document.createElement('a')
-          a.href = url
-          a.target = '_blank'
-          a.rel = 'noopener noreferrer'
-          document.body.appendChild(a)
-          a.click()
-          document.body.removeChild(a)
+        if (url && newWin) {
+          newWin.location.href = url
+        } else {
+          newWin?.close()
         }
       } else {
         // Legacy fallback: server returned the file directly as a blob
+        newWin?.close()
         const blob = await res.blob()
         const blobUrl = URL.createObjectURL(blob)
         const a = document.createElement('a')
@@ -298,6 +298,7 @@ function ReportCard({ report, index, uid }: { report: any; index: number; uid: s
         URL.revokeObjectURL(blobUrl)
       }
     } catch (err) {
+      newWin?.close()
       console.error('Download failed', err)
       alert('Failed to initiate download.')
     } finally {
