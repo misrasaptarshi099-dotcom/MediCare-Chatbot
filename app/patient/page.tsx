@@ -255,8 +255,48 @@ function ReportCard({ report, index, uid }: { report: any; index: number; uid: s
         alert('You must be logged in to download reports.')
         return
       }
-      const url = `/api/reports/download?reportId=${encodeURIComponent(report.id)}&token=${encodeURIComponent(token)}`
-      window.open(url, '_blank')
+
+      const res = await fetch('/api/reports/download', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ reportId: report.id }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Download failed' }))
+        alert(err.error || 'Failed to download report.')
+        return
+      }
+
+      // If the response is JSON with a signed URL, navigate to it
+      const contentType = res.headers.get('Content-Type') || ''
+      if (contentType.includes('application/json')) {
+        const { url } = await res.json()
+        if (url) {
+          // Use a temporary anchor to trigger the download without popup blockers
+          const a = document.createElement('a')
+          a.href = url
+          a.target = '_blank'
+          a.rel = 'noopener noreferrer'
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+        }
+      } else {
+        // Legacy fallback: server returned the file directly as a blob
+        const blob = await res.blob()
+        const blobUrl = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = blobUrl
+        a.download = report.fileName || 'report.pdf'
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(blobUrl)
+      }
     } catch (err) {
       console.error('Download failed', err)
       alert('Failed to initiate download.')
