@@ -1,21 +1,25 @@
 import { NextResponse } from 'next/server'
-import { getOtp, deleteOtp, getAdminUsers, type User } from '@/lib/db'
+import { getOtp, deleteOtp, getAdminUserByEmail } from '@/lib/db'
 import { cookies } from 'next/headers'
 import { createAdminSession } from '@/lib/admin-auth'
+import { verifyOtpSchema, validateInput } from '@/lib/sanitize'
 
 export async function POST(request: Request) {
-  const { email, code } = await request.json()
+  const body = await request.json()
 
-  if (!email || !code) {
-    return NextResponse.json({ error: 'Email and code are required' }, { status: 400 })
+  // Input validation
+  const validation = validateInput(verifyOtpSchema, body)
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 })
   }
+  const { email, code } = validation.data
 
   const normalizedEmail = email.toLowerCase().trim()
 
   // Validate OTP
   const entry = await getOtp(normalizedEmail, 'admin')
 
-  if (!entry || entry.code !== String(code)) {
+  if (!entry || entry.code !== code) {
     return NextResponse.json({ error: 'Invalid verification code. Please try again.' }, { status: 401 })
   }
 
@@ -27,9 +31,8 @@ export async function POST(request: Request) {
   // Code is valid — clean it up
   await deleteOtp(normalizedEmail, 'admin')
 
-  // Look up the admin user
-  const users = await getAdminUsers()
-  const adminUser = users.find(u => u.email?.toLowerCase().trim() === normalizedEmail)
+  // Look up the admin user (point lookup — 1 read)
+  const adminUser = await getAdminUserByEmail(normalizedEmail)
 
   if (!adminUser) {
     return NextResponse.json({ error: 'Admin user not found.' }, { status: 404 })
@@ -55,3 +58,4 @@ export async function POST(request: Request) {
     },
   })
 }
+

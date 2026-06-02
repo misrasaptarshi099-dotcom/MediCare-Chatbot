@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
 import {
-  getAdminUsers,
+  getAdminUserByEmail,
   getAllAppointments,
   getCallbackTickets,
   getAllChatSessions,
@@ -10,6 +10,8 @@ import {
   type Appointment,
   type CallbackTicket,
 } from '@/lib/db'
+import { checkRateLimit, rateLimitKey, getClientIp } from '@/lib/rate-limit'
+import { adminOtpSchema, validateInput } from '@/lib/sanitize'
 
 const OTP_TTL_MS = 10 * 60 * 1000
 
@@ -32,17 +34,38 @@ async function getAllPatientEmails(): Promise<Set<string>> {
 }
 
 export async function POST(request: Request) {
-  const { email } = await request.json()
-  if (!email) return NextResponse.json({ error: 'Email is required' }, { status: 400 })
+  const ip = getClientIp(request)
 
+  // Rate limit: 5 OTPs per hour per IP
+  const ipCheck = checkRateLimit(rateLimitKey('admin-otp-ip', ip), 5, 60 * 60 * 1000)
+  if (!ipCheck.allowed) {
+    return NextResponse.json(
+      { error: 'Too many OTP requests. Please try again later.' },
+      { status: 429 }
+    )
+  }
+
+  const body = await request.json()
+
+  // Input validation
+  const validation = validateInput(adminOtpSchema, body)
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 })
+  }
+  const { email } = validation.data
   const normalizedEmail = email.toLowerCase().trim()
 
-  // 1. Check if email belongs to a registered admin
-  let adminUser: User | undefined
-  try {
-    const users = await getAdminUsers()
-    adminUser = users.find(u => u.email?.toLowerCase().trim() === normalizedEmail)
-  } catch {}
+  // Rate limit: 5 OTPs per hour per email
+  const emailCheck = checkRateLimit(rateLimitKey('admin-otp-email', normalizedEmail), 5, 60 * 60 * 1000)
+  if (!emailCheck.allowed) {
+    return NextResponse.json(
+      { error: 'Too many OTP requests for this email. Please try again later.' },
+      { status: 429 }
+    )
+  }
+
+  // 1. Check if email belongs to a registered admin (point lookup — 1 read)
+  const adminUser = await getAdminUserByEmail(normalizedEmail)
 
   if (!adminUser) {
     // 2. Check if it's a patient email — give a specific error
@@ -97,3 +120,4 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ success: true, adminName: adminUser.name })
 }
+

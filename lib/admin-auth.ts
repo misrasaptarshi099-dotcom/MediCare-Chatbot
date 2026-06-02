@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers'
 import { db } from '@/lib/firestore'
-import { getAdminUsers, type User } from '@/lib/db'
+import { getAdminUser, type User } from '@/lib/db'
 import crypto from 'crypto'
 
 export async function createAdminSession(userId: string): Promise<string> {
@@ -34,6 +34,6 @@ export async function requireAdminSession(): Promise<User | null> {
   const userId = await verifyAdminSessionToken(session.value)
   if (!userId) return null
 
-  const users = await getAdminUsers()
-  return users.find(u => u.id === userId) ?? null
+  return await getAdminUser(userId)
 }
+

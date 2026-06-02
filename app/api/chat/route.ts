@@ -12,6 +12,8 @@ import {
   type UnansweredQuery,
   type ChatMessage as DbChatMessage,
 } from '@/lib/db'
+import { checkRateLimit, rateLimitKey, getClientIp } from '@/lib/rate-limit'
+import { validateInput, sanitizeHtml } from '@/lib/sanitize'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? '')
 const MODEL = process.env.GEMINI_MODEL ?? 'gemini-3.1-flash-lite'
@@ -302,6 +304,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Query is required' }, { status: 400 })
     }
 
+    // ── INPUT SANITIZATION ─────────────────────────────────────────────────
+    const sanitizedQuery = sanitizeHtml(query.slice(0, 1000))
+    if (!sanitizedQuery) {
+      return NextResponse.json({ error: 'Query is required' }, { status: 400 })
+    }
+
+    // ── RATE LIMITING ──────────────────────────────────────────────────────
+    const rateLimitId = effectiveUid || getClientIp(request)
+
+    // 5 messages per minute
+    const minuteCheck = checkRateLimit(rateLimitKey('chat-min', rateLimitId), 5, 60 * 1000)
+    if (!minuteCheck.allowed) {
+      return NextResponse.json(
+        { error: 'You are sending messages too quickly. Please wait a moment.' },
+        { status: 429 }
+      )
+    }
+
+    // 30 messages per day
+    const dailyCheck = checkRateLimit(rateLimitKey('chat-day', rateLimitId), 30, 24 * 60 * 60 * 1000)
+    if (!dailyCheck.allowed) {
+      return NextResponse.json(
+        { error: 'You have reached your daily message limit. Please try again tomorrow.' },
+        { status: 429 }
+      )
+    }
+
     if (!process.env.GEMINI_API_KEY) {
       return NextResponse.json(
         { error: 'GEMINI_API_KEY is not configured. Please add it to your .env.local file.' },
@@ -323,7 +352,7 @@ export async function POST(request: Request) {
           const existingMessages = existing?.messages ?? []
           const timestamp = Date.now()
           const newMsgs: DbChatMessage[] = [
-            { id: `u-${timestamp}`, type: 'user', content: query, timestamp },
+            { id: `u-${timestamp}`, type: 'user', content: sanitizedQuery, timestamp },
             { id: `a-${timestamp}`, type: 'assistant', content: responseMessage, timestamp }
           ]
           await appendChatMessages(effectiveUid, newMsgs, new Date().toISOString())
@@ -372,7 +401,7 @@ export async function POST(request: Request) {
     }))
 
     // Call Gemini with automatic retry on quota errors
-    const raw = await callGeminiWithRetry(query, systemPrompt, geminiHistory)
+    const raw = await callGeminiWithRetry(sanitizedQuery, systemPrompt, geminiHistory)
 
     let parsed: ParsedAIResponse
     try {
@@ -389,7 +418,7 @@ export async function POST(request: Request) {
 
     // Log escalated queries for admin review
     if (parsed.needsEscalation) {
-      await logUnansweredQuery(query, parsed.escalationReason ?? 'Escalated by AI')
+      await logUnansweredQuery(sanitizedQuery, parsed.escalationReason ?? 'Escalated by AI')
     }
 
     // Persist chat history if a UID is provided
@@ -399,7 +428,7 @@ export async function POST(request: Request) {
         const existingMessages = existing?.messages ?? []
 
         const timestamp = Date.now()
-        const userMsg: DbChatMessage = { id: `u-${timestamp}`, type: 'user', content: query, timestamp }
+        const userMsg: DbChatMessage = { id: `u-${timestamp}`, type: 'user', content: sanitizedQuery, timestamp }
         const aiMsg: DbChatMessage = { id: `a-${timestamp}`, type: 'assistant', content: parsed.message, timestamp }
 
         await appendChatMessages(effectiveUid, [userMsg, aiMsg], new Date().toISOString())
