@@ -229,10 +229,15 @@ export async function getAppointments(filters?: {
   if (filters?.status) query = query.where('status', '==', filters.status)
   if (filters?.patientEmail) query = query.where('patientEmail', '==', filters.patientEmail.toLowerCase())
 
-  query = query.orderBy('createdAt', 'desc')
+  query = query.orderBy('createdAt', 'desc').orderBy('__name__', 'desc')
 
   if (filters?.startAfterCursor) {
-    query = query.startAfter(filters.startAfterCursor)
+    const parts = filters.startAfterCursor.split('|')
+    if (parts.length === 2) {
+      query = query.startAfter(parts[0], parts[1])
+    } else {
+      query = query.startAfter(filters.startAfterCursor)
+    }
   }
 
   if (filters?.limit) {
@@ -749,10 +754,15 @@ export async function getAllPatients(): Promise<Patient[]> {
 }
 
 export async function getPatientsPaginated(limit: number, startAfterCursor?: string): Promise<Patient[]> {
-  let query: FirebaseFirestore.Query = db.collection('patients').orderBy('createdAt', 'desc')
+  let query: FirebaseFirestore.Query = db.collection('patients').orderBy('createdAt', 'desc').orderBy('__name__', 'desc')
   
   if (startAfterCursor) {
-    query = query.startAfter(startAfterCursor)
+    const parts = startAfterCursor.split('|')
+    if (parts.length === 2) {
+      query = query.startAfter(parts[0], parts[1])
+    } else {
+      query = query.startAfter(startAfterCursor)
+    }
   }
   
   query = query.limit(limit)

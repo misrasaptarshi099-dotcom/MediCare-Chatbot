@@ -5,42 +5,54 @@ import {
   getAppointment,
   updateAppointment,
   addAppointment,
-  getWaitlist,
-  deleteWaitlistEntry,
   type Appointment,
   type WaitlistEntry,
 } from '@/lib/db'
+import { db } from '@/lib/firestore'
 
-/** Promote first waitlisted patient into a real appointment when a slot frees up */
+/** Promote first waitlisted patient into a real appointment when a slot frees up.
+ *  Uses a Firestore transaction so the read-delete-create is atomic. */
 async function promoteFromWaitlist(doctorId: string, date: string, time: string): Promise<WaitlistEntry | null> {
   try {
-    const waitlist = await getWaitlist()
-    const match = waitlist
-      .filter(e => e.doctorId === doctorId && e.date === date && e.time === time)
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())[0]
+    return await db.runTransaction(async (txn) => {
+      const waitlistQuery = db.collection('waitlist')
+        .where('doctorId', '==', doctorId)
+        .where('date', '==', date)
+        .where('time', '==', time)
+        .orderBy('createdAt', 'asc')
+        .limit(1)
 
-    if (!match) return null
+      const snap = await txn.get(waitlistQuery)
+      if (snap.empty) return null
 
-    // Remove from waitlist
-    await deleteWaitlistEntry(match.id)
+      const doc = snap.docs[0]
+      const match = { id: doc.id, ...doc.data() } as WaitlistEntry
 
-    // Book their appointment
-    const newApt: Appointment = {
-      id: `apt-${Date.now()}`,
-      patientName: match.patientName,
-      patientPhone: match.patientPhone,
-      patientEmail: match.patientEmail,
-      doctorId: match.doctorId,
-      doctorName: match.doctorName,
-      date: match.date,
-      time: match.time,
-      service: match.service,
-      status: 'scheduled',
-      createdAt: new Date().toISOString(),
-    }
-    await addAppointment(newApt)
-    return match
-  } catch { return null }
+      // Delete from waitlist inside the transaction
+      txn.delete(doc.ref)
+
+      // Create the appointment inside the transaction
+      const newApt: Appointment = {
+        id: `apt-${Date.now()}`,
+        patientName: match.patientName,
+        patientPhone: match.patientPhone,
+        patientEmail: match.patientEmail,
+        doctorId: match.doctorId,
+        doctorName: match.doctorName,
+        date: match.date,
+        time: match.time,
+        service: match.service,
+        status: 'scheduled',
+        createdAt: new Date().toISOString(),
+      }
+      txn.set(db.collection('appointments').doc(newApt.id), newApt)
+
+      return match
+    })
+  } catch (err) {
+    console.error('promoteFromWaitlist transaction failed:', err)
+    return null
+  }
 }
 
 export async function GET(request: Request) {
@@ -52,7 +64,11 @@ export async function GET(request: Request) {
   const statusFilter = searchParams.get('status')
   const cursor = searchParams.get('cursor')
   const limitStr = searchParams.get('limit')
-  const limit = limitStr ? parseInt(limitStr, 10) : 100
+  const parsedLimit = limitStr ? parseInt(limitStr, 10) : 100
+  if (limitStr && (isNaN(parsedLimit) || parsedLimit <= 0)) {
+    return NextResponse.json({ error: 'Invalid limit parameter' }, { status: 400 })
+  }
+  const limit = Math.min(Math.max(parsedLimit, 1), 100)
 
   try {
     const filters: any = { limit }
@@ -64,7 +80,7 @@ export async function GET(request: Request) {
     
     // We get them sorted by createdAt desc by default from the DB.
     const nextCursor = appointments.length === limit && appointments.length > 0 
-      ? appointments[appointments.length - 1].createdAt 
+      ? `${appointments[appointments.length - 1].createdAt}|${appointments[appointments.length - 1].id}` 
       : null
 
     return NextResponse.json({ appointments, nextCursor })

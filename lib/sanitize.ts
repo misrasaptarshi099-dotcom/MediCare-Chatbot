@@ -33,6 +33,14 @@ export function sanitizeHtml(text: string): string {
   return text.replace(HTML_ESCAPE_RE, (char) => HTML_ENTITY_MAP[char] || char).trim()
 }
 
+/**
+ * Normalize plain text for Firestore storage: trim, collapse whitespace, strip
+ * control characters. Does NOT HTML-encode — use sanitizeHtml at HTML sinks.
+ */
+export function sanitizePlainText(text: string): string {
+  return text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '').replace(/\s+/g, ' ').trim()
+}
+
 // ── Zod Schemas ───────────────────────────────────────────────────────────────
 
 /** Chat message from the web portal */
@@ -41,7 +49,7 @@ export const chatMessageSchema = z.object({
     .string()
     .min(1, 'Message cannot be empty')
     .max(1000, 'Message is too long (max 1000 characters)')
-    .transform(sanitizeHtml),
+    .transform(sanitizePlainText),
   conversationHistory: z
     .array(
       z.object({
@@ -62,7 +70,7 @@ export const appointmentSchema = z.object({
     .string()
     .min(1, 'Patient name is required')
     .max(100, 'Patient name is too long')
-    .transform(sanitizeHtml),
+    .transform(sanitizePlainText),
   patientPhone: z
     .string()
     .max(20, 'Phone number is too long')
@@ -82,7 +90,7 @@ export const appointmentSchema = z.object({
   doctorName: z
     .string()
     .max(100)
-    .transform(sanitizeHtml)
+    .transform(sanitizePlainText)
     .optional(),
   date: z
     .string()
@@ -92,7 +100,7 @@ export const appointmentSchema = z.object({
   service: z
     .string()
     .max(200, 'Service name is too long')
-    .transform(sanitizeHtml)
+    .transform(sanitizePlainText)
     .optional()
     .default('General Consultation'),
   paymentStatus: z.enum(['paid', 'unpaid', 'refunded']).optional(),
@@ -105,7 +113,7 @@ export const adminLoginSchema = z.object({
     .string()
     .min(1, 'Username is required')
     .max(50, 'Username is too long')
-    .transform(sanitizeHtml),
+    .transform(sanitizePlainText),
   password: z
     .string()
     .min(1, 'Password is required')
@@ -125,7 +133,15 @@ export const patientOtpSchema = z.object({
   identifier: z
     .string()
     .min(1, 'Identifier is required')
-    .max(254, 'Identifier is too long'),
+    .max(254, 'Identifier is too long')
+    .refine(
+      (val) => {
+        const trimmed = val.trim()
+        // Valid email or valid phone (digits with optional leading +)
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed) || /^\+?[0-9]{7,15}$/.test(trimmed)
+      },
+      { message: 'Must be a valid email address or phone number' }
+    ),
 })
 
 /** OTP verify payload */

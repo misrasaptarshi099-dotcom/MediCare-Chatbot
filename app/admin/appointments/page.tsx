@@ -44,9 +44,17 @@ export default function AppointmentsPage() {
     fetchAppointments()
   }, [])
 
+  // Reset pagination when filter changes
+  useEffect(() => {
+    setCursorStack([])
+    setNextCursor(null)
+    fetchAppointments()
+  }, [filter])
+
   const fetchAppointments = async (cursor?: string) => {
     const url = new URL('/api/admin/appointments', window.location.origin)
     if (cursor) url.searchParams.set('cursor', cursor)
+    if (filter !== 'all') url.searchParams.set('status', filter)
     const res = await fetch(url.toString())
     const data = await res.json()
     setAppointments(data.appointments || [])
@@ -71,9 +79,11 @@ export default function AppointmentsPage() {
     fetchAppointments()
   }
 
-  const filteredAppointments = appointments.filter(apt => 
-    filter === 'all' ? true : apt.status === filter
-  )
+  // When a status filter is active, the server already returns only matching results.
+  // When 'all', we still need to show everything (no client-side filter needed).
+  const filteredAppointments = filter === 'all'
+    ? appointments
+    : appointments.filter(apt => apt.status === filter)
 
   const getStatusBadge = (status: string) => {
     switch (status) {

@@ -30,7 +30,8 @@ export async function GET(request: Request) {
     })
 
     // Attach queue position per slot — reuse the UNFILTERED fetch for position calc
-    const allEntries = doctorFilter || dateFilter ? await getWaitlist() : entries
+    const hasActiveFilter = (doctorFilter && doctorFilter !== 'all') || (dateFilter && dateFilter !== 'all')
+    const allEntries = hasActiveFilter ? await getWaitlist() : entries
     const withPosition = entries.map(entry => {
       const slotEntries = allEntries
         .filter(e => e.doctorId === entry.doctorId && e.date === entry.date && e.time === entry.time)
