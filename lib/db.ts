@@ -219,6 +219,8 @@ export async function getAppointments(filters?: {
   date?: string
   status?: string
   patientEmail?: string
+  limit?: number
+  startAfterCursor?: string
 }): Promise<Appointment[]> {
   let query: FirebaseFirestore.Query = db.collection('appointments')
 
@@ -227,6 +229,21 @@ export async function getAppointments(filters?: {
   if (filters?.status) query = query.where('status', '==', filters.status)
   if (filters?.patientEmail) query = query.where('patientEmail', '==', filters.patientEmail.toLowerCase())
 
+  query = query.orderBy('createdAt', 'desc').orderBy('__name__', 'desc')
+
+  if (filters?.startAfterCursor) {
+    const parts = filters.startAfterCursor.split('|')
+    if (parts.length === 2) {
+      query = query.startAfter(parts[0], parts[1])
+    } else {
+      query = query.startAfter(filters.startAfterCursor)
+    }
+  }
+
+  if (filters?.limit) {
+    query = query.limit(filters.limit)
+  }
+
   const snap = await query.get()
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment))
 }
@@ -234,6 +251,22 @@ export async function getAppointments(filters?: {
 export async function getAllAppointments(): Promise<Appointment[]> {
   const snap = await db.collection('appointments').get()
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment))
+}
+
+export async function getAppointmentStats(): Promise<{ count: number, recent: Partial<Appointment>[] }> {
+  const [countSnap, recentSnap] = await Promise.all([
+    db.collection('appointments').count().get(),
+    db.collection('appointments')
+      .orderBy('createdAt', 'desc')
+      .limit(5)
+      .select('patientName', 'doctorName', 'date', 'time')
+      .get()
+  ]);
+  
+  return {
+    count: countSnap.data().count,
+    recent: recentSnap.docs.map(d => ({ id: d.id, ...d.data() } as Partial<Appointment>))
+  };
 }
 
 export async function getAppointmentsByPatientUid(patientUid: string): Promise<Appointment[]> {
@@ -341,16 +374,24 @@ export async function getAdminUser(id: string): Promise<User | null> {
 }
 
 export async function getAdminUserByUsername(username: string): Promise<User | null> {
-  const snap = await db.collection('adminUsers').where('username', '==', username).limit(1).get()
+  const snap = await db.collection('adminUsers').where('username', '==', username).get()
   if (snap.empty) return null
+  if (snap.size > 1) {
+    console.error(`SECURITY: Multiple admin users with username "${username}" — refusing to authenticate`)
+    return null
+  }
   const doc = snap.docs[0]
   return { id: doc.id, ...doc.data() } as User
 }
 
 export async function getAdminUserByEmail(email: string): Promise<User | null> {
   const normalizedEmail = email.toLowerCase().trim()
-  const snap = await db.collection('adminUsers').where('email', '==', normalizedEmail).limit(1).get()
+  const snap = await db.collection('adminUsers').where('email', '==', normalizedEmail).get()
   if (snap.empty) return null
+  if (snap.size > 1) {
+    console.error(`SECURITY: Multiple admin users with email "${normalizedEmail}" — refusing to authenticate`)
+    return null
+  }
   const doc = snap.docs[0]
   return { id: doc.id, ...doc.data() } as User
 }
@@ -391,6 +432,7 @@ export async function saveChatSession(uid: string, messages: ChatMessage[], last
   await db.collection('chatSessions').doc(uid).set({
     uid,
     messages,
+    messageCount: messages.length,
     lastUpdated,
   })
 }
@@ -414,6 +456,7 @@ export async function appendChatMessages(uid: string, newMessages: ChatMessage[]
     t.set(docRef, {
       uid,
       messages: finalMessages,
+      messageCount: finalMessages.length,
       lastUpdated,
     }, { merge: true })
   })
@@ -707,6 +750,24 @@ export async function getPatientByUid(uid: string): Promise<Patient | null> {
 
 export async function getAllPatients(): Promise<Patient[]> {
   const snap = await db.collection('patients').get()
+  return snap.docs.map(d => d.data() as Patient)
+}
+
+export async function getPatientsPaginated(limit: number, startAfterCursor?: string): Promise<Patient[]> {
+  let query: FirebaseFirestore.Query = db.collection('patients').orderBy('createdAt', 'desc').orderBy('__name__', 'desc')
+  
+  if (startAfterCursor) {
+    const parts = startAfterCursor.split('|')
+    if (parts.length === 2) {
+      query = query.startAfter(parts[0], parts[1])
+    } else {
+      query = query.startAfter(startAfterCursor)
+    }
+  }
+  
+  query = query.limit(limit)
+  
+  const snap = await query.get()
   return snap.docs.map(d => d.data() as Patient)
 }
 

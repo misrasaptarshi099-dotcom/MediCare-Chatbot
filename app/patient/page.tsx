@@ -279,10 +279,16 @@ function ReportCard({ report, index, uid }: { report: any; index: number; uid: s
       const contentType = res.headers.get('Content-Type') || ''
       if (contentType.includes('application/json')) {
         const { url } = await res.json()
-        if (url && newWin) {
-          newWin.location.href = url
+        if (url) {
+          if (newWin) {
+            newWin.location.href = url
+          } else {
+            // Popup was blocked — fall back to same-tab navigation
+            window.location.href = url
+          }
         } else {
           newWin?.close()
+          alert('Failed to generate download link. Please try again.')
         }
       } else {
         // Legacy fallback: server returned the file directly as a blob

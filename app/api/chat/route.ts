@@ -13,7 +13,7 @@ import {
   type ChatMessage as DbChatMessage,
 } from '@/lib/db'
 import { checkRateLimit, rateLimitKey, getClientIp } from '@/lib/rate-limit'
-import { validateInput, sanitizeHtml } from '@/lib/sanitize'
+import { validateInput, sanitizePlainText } from '@/lib/sanitize'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? '')
 const MODEL = process.env.GEMINI_MODEL ?? 'gemini-3.1-flash-lite'
@@ -305,7 +305,7 @@ export async function POST(request: Request) {
     }
 
     // ── INPUT SANITIZATION ─────────────────────────────────────────────────
-    const sanitizedQuery = sanitizeHtml(query.slice(0, 1000))
+    const sanitizedQuery = sanitizePlainText(query.slice(0, 1000))
     if (!sanitizedQuery) {
       return NextResponse.json({ error: 'Query is required' }, { status: 400 })
     }
@@ -341,7 +341,7 @@ export async function POST(request: Request) {
     // ── SHORT-CIRCUIT: All-department coverage query ───────────────────────────
     // This type of query reliably overflows the AI's token budget, so we handle
     // it directly from the database instead of sending it to Gemini.
-    if (isAllDepartmentCoverageQuery(query)) {
+    if (isAllDepartmentCoverageQuery(sanitizedQuery)) {
       const allCoverageResults = await buildAllDepartmentCoverageResults()
       const responseMessage = `Here's a full breakdown of insurance coverage for each department at MediCare. Each card shows which insurers cover that department's services and at what percentage.`
 
@@ -460,7 +460,7 @@ export async function POST(request: Request) {
         const existingMessages = existing?.messages ?? []
 
         const timestamp = Date.now()
-        const userMsg: DbChatMessage = { id: `u-${timestamp}`, type: 'user', content: userQuery, timestamp }
+        const userMsg: DbChatMessage = { id: `u-${timestamp}`, type: 'user', content: sanitizePlainText(userQuery.slice(0, 1000)), timestamp }
 
         let errorReply = "I'm sorry, something went wrong. Please try again."
         if (message.includes('quota') || message.includes('RESOURCE_EXHAUSTED')) {

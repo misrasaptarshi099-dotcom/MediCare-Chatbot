@@ -79,9 +79,6 @@ export async function POST(request: Request) {
 
 export async function GET() {
   try {
-    const cookieStore = await cookies()
-    const session = cookieStore.get('session')
-
     const user = await requireAdminSession()
 
     if (!user) {

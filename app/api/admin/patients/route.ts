@@ -1,7 +1,7 @@
 import { requireAdminSession } from '@/lib/admin-auth'
 import { NextResponse } from 'next/server'
 import {
-  getAllPatients,
+  getPatientsPaginated,
   getAllAppointments,
   getAllChatSessions,
   getCallbackTickets,
@@ -12,13 +12,21 @@ import {
 import { db } from '@/lib/firestore'
 import { adminAuth } from '@/lib/firebase-admin'
 
-// GET — list all unique patients from the patients collection
-export async function GET() {
+export async function GET(request: Request) {
   const adminUser = await requireAdminSession();
   if (!adminUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  const { searchParams } = new URL(request.url)
+  const cursor = searchParams.get('cursor')
+  const limitStr = searchParams.get('limit')
+  const parsedLimit = limitStr ? parseInt(limitStr, 10) : 100
+  if (limitStr && (isNaN(parsedLimit) || parsedLimit <= 0)) {
+    return NextResponse.json({ error: 'Invalid limit parameter' }, { status: 400 })
+  }
+  const limit = Math.min(Math.max(parsedLimit, 1), 100)
+
   try {
-    const patients = await getAllPatients()
+    const patients = await getPatientsPaginated(limit, cursor || undefined)
     const patientMap: Record<string, any> = {}
 
     for (const p of patients) {
@@ -36,51 +44,111 @@ export async function GET() {
         appointmentCount: 0,
         callbackCount: 0,
         chatCount: 0,
+        createdAt: (p as any).createdAt || null
       }
     }
 
-    // From appointments
-    try {
-      const appointments = await getAllAppointments()
-      for (const apt of appointments) {
-        const uid = apt.patientUid
-        if (uid && patientMap[uid]) {
-          patientMap[uid].appointmentCount++
-        } else if (apt.patientEmail) {
-          const e = apt.patientEmail.toLowerCase().trim()
-          const p = Object.values(patientMap).find(pat => pat.email?.toLowerCase().trim() === e)
-          if (p) p.appointmentCount++
-        }
-      }
-    } catch {}
+    const uids = patients.map(p => p.uid).filter(Boolean)
+    const emails = patients.map(p => p.email?.toLowerCase().trim()).filter(Boolean)
+    const uniqueEmails = Array.from(new Set(emails))
 
-    // From callback tickets
-    try {
-      const tickets = await getCallbackTickets()
-      for (const cb of tickets) {
-        const uid = cb.patientUid
-        if (uid && patientMap[uid]) {
-          patientMap[uid].callbackCount++
-        } else if (cb.patientEmail) {
-           const e = cb.patientEmail.toLowerCase().trim()
-           const p = Object.values(patientMap).find(pat => pat.email?.toLowerCase().trim() === e)
-           if (p) p.callbackCount++
-        }
-      }
-    } catch {}
+    const chunkArray = (arr: string[], size: number) => {
+      const chunks = []
+      for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size))
+      return chunks
+    }
 
-    // From chat sessions
-    try {
-      const sessions = await getAllChatSessions()
-      // Chat session IDs are usually the user UID
-      for (const s of sessions) {
-         if (s.uid && patientMap[s.uid]) {
-           patientMap[s.uid].chatCount = s.messages?.length || 0
-         }
-      }
-    } catch {}
+    const uidChunks = chunkArray(uids, 30)
+    const emailChunks = chunkArray(uniqueEmails, 30)
 
-    return NextResponse.json({ patients: Object.values(patientMap) })
+    // From appointments (use batched IN queries)
+    try {
+      const promises: Promise<FirebaseFirestore.QuerySnapshot>[] = []
+      for (const chunk of uidChunks) {
+        promises.push(db.collection('appointments').where('patientUid', 'in', chunk).select('patientUid', 'patientEmail').get())
+      }
+      for (const chunk of emailChunks) {
+        promises.push(db.collection('appointments').where('patientEmail', 'in', chunk).select('patientUid', 'patientEmail').get())
+      }
+      const snaps = await Promise.all(promises)
+      const seenApts = new Set<string>()
+      
+      snaps.forEach(snap => {
+        snap.forEach(doc => {
+          if (seenApts.has(doc.id)) return
+          seenApts.add(doc.id)
+          const apt = doc.data()
+          const uid = apt.patientUid
+          if (uid && patientMap[uid]) {
+            patientMap[uid].appointmentCount++
+          } else if (apt.patientEmail) {
+            const e = apt.patientEmail.toLowerCase().trim()
+            const p = Object.values(patientMap).find(pat => pat.email?.toLowerCase().trim() === e)
+            if (p) p.appointmentCount++
+          }
+        })
+      })
+    } catch (err) { console.error('Failed to count appointments:', err) }
+
+    // From callback tickets (use batched IN queries)
+    try {
+      const promises: Promise<FirebaseFirestore.QuerySnapshot>[] = []
+      for (const chunk of uidChunks) {
+        promises.push(db.collection('callbackTickets').where('patientUid', 'in', chunk).select('patientUid', 'patientEmail').get())
+      }
+      for (const chunk of emailChunks) {
+        promises.push(db.collection('callbackTickets').where('patientEmail', 'in', chunk).select('patientUid', 'patientEmail').get())
+      }
+      const snaps = await Promise.all(promises)
+      const seenCbs = new Set<string>()
+      
+      snaps.forEach(snap => {
+        snap.forEach(doc => {
+          if (seenCbs.has(doc.id)) return
+          seenCbs.add(doc.id)
+          const cb = doc.data()
+          const uid = cb.patientUid
+          if (uid && patientMap[uid]) {
+            patientMap[uid].callbackCount++
+          } else if (cb.patientEmail) {
+             const e = cb.patientEmail.toLowerCase().trim()
+             const p = Object.values(patientMap).find(pat => pat.email?.toLowerCase().trim() === e)
+             if (p) p.callbackCount++
+          }
+        })
+      })
+    } catch (err) { console.error('Failed to count callback tickets:', err) }
+
+    // From chat sessions (use batched IN queries)
+    try {
+      const promises: Promise<FirebaseFirestore.QuerySnapshot>[] = []
+      for (const chunk of uidChunks) {
+        promises.push(db.collection('chatSessions').where('uid', 'in', chunk).select('uid', 'messageCount').get())
+      }
+      const snaps = await Promise.all(promises)
+      const seenChats = new Set<string>()
+      
+      snaps.forEach(snap => {
+        snap.forEach(doc => {
+          if (seenChats.has(doc.id)) return
+          seenChats.add(doc.id)
+          const data = doc.data()
+          const uid = data.uid || doc.id
+          if (uid && patientMap[uid]) {
+            patientMap[uid].chatCount = data.messageCount ?? 0
+          }
+        })
+      })
+    } catch (err) { console.error('Failed to count chat sessions:', err) }
+
+    const patientsList = Object.values(patientMap)
+    
+    // Only return a next cursor if we hit the limit (meaning there MIGHT be more data)
+    const nextCursor = patients.length === limit && patientsList.length > 0 
+      ? `${patients[patients.length - 1].createdAt}|${patients[patients.length - 1].uid}` 
+      : null
+    
+    return NextResponse.json({ patients: patientsList, nextCursor })
   } catch (err) {
     console.error('Error fetching patients:', err)
     return NextResponse.json({ error: 'Failed to fetch patients' }, { status: 500 })

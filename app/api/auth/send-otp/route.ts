@@ -19,7 +19,12 @@ export async function POST(request: Request) {
     )
   }
 
-  const body = await request.json()
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
 
   // Input validation
   const validation = validateInput(patientOtpSchema, body)
@@ -29,6 +34,11 @@ export async function POST(request: Request) {
 
   let normalizedIdentifier = validation.data.identifier.trim()
   const isPhone = /^\+?[0-9]{10,15}$/.test(normalizedIdentifier)
+
+  // Normalize early: lowercase for emails so case variations share the same bucket
+  if (!isPhone) {
+    normalizedIdentifier = normalizedIdentifier.toLowerCase()
+  }
 
   // Ensure phone numbers have a country code (default to +91 for India if missing)
   if (isPhone && !normalizedIdentifier.startsWith('+')) {
@@ -56,11 +66,30 @@ export async function POST(request: Request) {
   await saveOtp(normalizedIdentifier, code, expiresAt, 'patient')
 
   if (isPhone) {
-    // MOCK SMS SENDING
-    // In a real production app, you would integrate Twilio, MSG91, AWS SNS here,
-    // OR use Firebase Client SDK's signInWithPhoneNumber (which bypasses this endpoint).
-    console.log(`\n\n📱 [MOCK SMS] OTP for ${normalizedIdentifier} is: ${code}\n\n`)
-    return NextResponse.json({ success: true, message: 'OTP sent to phone (mock)' })
+    // Check if an SMS provider is configured (Twilio, MSG91, etc.)
+    const smsConfigured = !!(process.env.TWILIO_ACCOUNT_SID || process.env.MSG91_AUTH_KEY || process.env.SMS_PROVIDER)
+
+    if (smsConfigured) {
+      // TODO: Integrate actual SMS provider here (Twilio, MSG91, AWS SNS)
+      // await sendSms(normalizedIdentifier, `Your MediCare code is: ${code}`)
+      console.error('SMS Provider is configured in env but SMS integration code is not yet implemented')
+      return NextResponse.json(
+        { error: 'SMS integration is not fully implemented yet' },
+        { status: 501 }
+      )
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`\n\n📱 [MOCK SMS] OTP for ${normalizedIdentifier} is: ${code}\n\n`)
+      return NextResponse.json({ success: true, message: 'OTP sent to phone (mock)' })
+    }
+
+    // Production with no SMS provider configured — fail explicitly
+    console.error('SMS OTP requested but no SMS provider is configured')
+    return NextResponse.json(
+      { error: 'SMS delivery is not configured. Please use email login or contact support.' },
+      { status: 503 }
+    )
   }
 
   // Send the OTP via email

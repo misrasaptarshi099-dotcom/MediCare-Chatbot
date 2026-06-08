@@ -15,5 +15,8 @@
         "npm --prefix functions run build"
       ]
     }
-  ]
+  ],
+  "firestore": {
+    "indexes": "firestore.indexes.json"
+  }
 }

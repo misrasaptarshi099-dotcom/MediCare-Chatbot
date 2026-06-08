@@ -11,7 +11,7 @@ import {
   type CallbackTicket,
 } from '@/lib/db'
 import { checkRateLimit, rateLimitKey, getClientIp } from '@/lib/rate-limit'
-import { sanitizeHtml } from '@/lib/sanitize'
+import { sanitizePlainText } from '@/lib/sanitize'
 
 export async function POST(request: Request) {
   const adminUser = await requireAdminSession();
@@ -20,8 +20,9 @@ export async function POST(request: Request) {
   try {
     const ip = getClientIp(request)
 
-    // Rate limit: 3 escalation actions per day per IP
-    const check = checkRateLimit(rateLimitKey('escalation-day', ip), 3, 24 * 60 * 60 * 1000)
+    // Rate limit: 3 escalation actions per day per admin (keyed by admin user ID, IP fallback)
+    const rateLimitId = adminUser.id || ip
+    const check = checkRateLimit(rateLimitKey('escalation-day', rateLimitId), 3, 24 * 60 * 60 * 1000)
     if (!check.allowed) {
       return NextResponse.json(
         { error: 'Too many escalation requests today. Please try again tomorrow.' },
@@ -33,8 +34,8 @@ export async function POST(request: Request) {
     const { action, ...data } = body
 
     if (action === 'log_unanswered') {
-      const query = typeof data.query === 'string' ? sanitizeHtml(data.query.slice(0, 500)) : ''
-      const reason = typeof data.reason === 'string' ? sanitizeHtml(data.reason.slice(0, 500)) : ''
+      const query = typeof data.query === 'string' ? sanitizePlainText(data.query.slice(0, 500)) : ''
+      const reason = typeof data.reason === 'string' ? sanitizePlainText(data.reason.slice(0, 500)) : ''
 
       if (!query || !reason) {
         return NextResponse.json({ error: 'Query and reason are required' }, { status: 400 })
@@ -53,14 +54,19 @@ export async function POST(request: Request) {
     }
 
     if (action === 'create_callback') {
-      const patientName = typeof data.patientName === 'string' ? sanitizeHtml(data.patientName.slice(0, 100)) : ''
-      const patientPhone = typeof data.patientPhone === 'string' ? data.patientPhone.slice(0, 20) : ''
+      const patientName = typeof data.patientName === 'string' ? sanitizePlainText(data.patientName.slice(0, 100)) : ''
+      const patientPhone = typeof data.patientPhone === 'string' ? data.patientPhone.trim().slice(0, 20) : ''
       const patientEmail = typeof data.patientEmail === 'string' ? data.patientEmail.slice(0, 254) : ''
-      const querySummary = typeof data.querySummary === 'string' ? sanitizeHtml(data.querySummary.slice(0, 500)) : ''
-      const department = typeof data.department === 'string' ? sanitizeHtml(data.department.slice(0, 100)) : 'General'
+      const querySummary = typeof data.querySummary === 'string' ? sanitizePlainText(data.querySummary.slice(0, 500)) : ''
+      const department = typeof data.department === 'string' ? sanitizePlainText(data.department.slice(0, 100)) : 'General'
 
       if (!patientName || !patientPhone || !querySummary) {
         return NextResponse.json({ error: 'Patient details and query summary are required' }, { status: 400 })
+      }
+
+      // Basic phone format validation
+      if (!/^\+?[0-9]{7,20}$/.test(patientPhone)) {
+        return NextResponse.json({ error: 'Invalid phone number format' }, { status: 400 })
       }
 
       const newTicket: CallbackTicket = {
