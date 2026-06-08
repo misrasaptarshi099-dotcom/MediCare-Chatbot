@@ -72,7 +72,11 @@ export async function POST(request: Request) {
     if (smsConfigured) {
       // TODO: Integrate actual SMS provider here (Twilio, MSG91, AWS SNS)
       // await sendSms(normalizedIdentifier, `Your MediCare code is: ${code}`)
-      return NextResponse.json({ success: true, message: 'OTP sent to phone' })
+      console.error('SMS Provider is configured in env but SMS integration code is not yet implemented')
+      return NextResponse.json(
+        { error: 'SMS integration is not fully implemented yet' },
+        { status: 501 }
+      )
     }
 
     if (process.env.NODE_ENV !== 'production') {

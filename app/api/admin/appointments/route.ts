@@ -32,11 +32,13 @@ async function promoteFromWaitlist(doctorId: string, date: string, time: string)
       txn.delete(doc.ref)
 
       // Create the appointment inside the transaction
+      const newAptRef = db.collection('appointments').doc()
       const newApt: Appointment = {
-        id: `apt-${Date.now()}`,
+        id: newAptRef.id,
         patientName: match.patientName,
         patientPhone: match.patientPhone,
         patientEmail: match.patientEmail,
+        patientUid: match.patientUid,
         doctorId: match.doctorId,
         doctorName: match.doctorName,
         date: match.date,
@@ -86,7 +88,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ appointments, nextCursor })
   } catch (error) {
     console.error('Error fetching appointments:', error)
-    return NextResponse.json({ appointments: [] })
+    return NextResponse.json({ error: 'Failed to fetch appointments' }, { status: 500 })
   }
 }
 
