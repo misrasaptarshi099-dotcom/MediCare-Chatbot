@@ -23,8 +23,12 @@ export async function POST(request: Request) {
 
     const body = await request.json()
     const { action, doctor } = body
-
+    
     if (action === 'update') {
+      if (typeof doctor !== 'object' || doctor === null || !doctor.id) {
+        return NextResponse.json({ error: 'Invalid doctor object or missing doctor.id' }, { status: 400 })
+      }
+
       const existing = await getDoctor(doctor.id)
 
       if (existing) {

@@ -468,6 +468,7 @@ export default function PatientDashboard() {
                 {TABS.map(({ key, label, icon: Icon }) => (
                   <button
                     key={key}
+                    aria-label={label}
                     onClick={() => setActiveTab(key)}
                     className="relative flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-full text-sm font-medium z-10 transition-colors whitespace-nowrap"
                   >
@@ -497,14 +498,16 @@ export default function PatientDashboard() {
               <div className="flex items-center gap-2 shrink-0">
                 <Link
                   href="/patient/profile"
+                  aria-label={`Open profile for ${patientProfile?.name ?? 'patient'}`}
                   className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-muted border border-border/60 text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors"
                 >
                   <User className="h-3 w-3" />
                   <span className="font-medium hidden sm:block">{patientProfile?.name}</span>
                 </Link>
-                <ThemeToggle />
+                <ThemeToggle aria-label="Toggle theme" />
                 <button
                   onClick={handleSignOut}
+                  aria-label="Sign out"
                   className="p-1.5 text-muted-foreground hover:text-destructive transition-colors"
                 >
                   <LogOut className="h-4 w-4" />

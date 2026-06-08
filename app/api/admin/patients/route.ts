@@ -144,9 +144,14 @@ export async function GET(request: Request) {
     const patientsList = Object.values(patientMap)
     
     // Only return a next cursor if we hit the limit (meaning there MIGHT be more data)
-    const nextCursor = patients.length === limit && patientsList.length > 0 
-      ? `${patients[patients.length - 1].createdAt}|${patients[patients.length - 1].uid}` 
-      : null
+    let nextCursor = null
+    if (patients.length === limit && patientsList.length > 0) {
+      const lastPat = patients[patients.length - 1]
+      const ca = (lastPat as any).createdAt
+      if (ca && ca !== 'undefined' && !isNaN(Date.parse(ca))) {
+        nextCursor = `${ca}|${lastPat.uid}`
+      }
+    }
     
     return NextResponse.json({ patients: patientsList, nextCursor })
   } catch (err) {

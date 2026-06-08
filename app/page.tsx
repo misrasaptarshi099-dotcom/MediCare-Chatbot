@@ -179,23 +179,25 @@ export default function HomePage() {
 
           <div className="flex items-center gap-4">
             <ThemeToggle />
-            <Link href="/patient">
-              <motion.button
+            <Link href="/patient" passHref legacyBehavior>
+              <motion.a
+                role="button"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
               >
                 Patient Portal
-              </motion.button>
+              </motion.a>
             </Link>
-            <Link href="/login">
-              <motion.button
+            <Link href="/login" passHref legacyBehavior>
+              <motion.a
+                role="button"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="px-5 py-2 text-sm font-semibold bg-primary text-primary-foreground rounded-full shadow-md transition-all"
               >
                 Admin
-              </motion.button>
+              </motion.a>
             </Link>
           </div>
         </motion.div>
@@ -231,15 +233,16 @@ export default function HomePage() {
           </motion.p>
 
           <motion.div variants={fadeUp} className="flex flex-wrap justify-center gap-4">
-            <Link href="/patient">
-              <motion.button
+            <Link href="/patient" passHref legacyBehavior>
+              <motion.a
+                role="button"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="flex items-center gap-2.5 px-8 py-4 bg-primary text-primary-foreground font-semibold rounded-full shadow-lg shadow-primary/25 transition-all text-base"
               >
                 <MessageSquare className="h-5 w-5" />
                 Start Chatting
-              </motion.button>
+              </motion.a>
             </Link>
           </motion.div>
 
@@ -358,8 +361,9 @@ export default function HomePage() {
               Ask any health question, book appointments, or check your insurance coverage —
               all in seconds, in any language.
             </p>
-            <Link href="/patient">
-              <motion.button
+            <Link href="/patient" passHref legacyBehavior>
+              <motion.a
+                role="button"
                 whileHover={{ scale: 1.06, boxShadow: '0 12px 50px rgba(59,130,246,0.45)' }}
                 whileTap={{ scale: 0.97 }}
                 className="group inline-flex items-center gap-3 px-9 py-4 bg-primary text-primary-foreground text-lg font-semibold rounded-2xl shadow-lg shadow-primary/25 transition-all"
@@ -372,7 +376,7 @@ export default function HomePage() {
                 >
                   <ArrowRight className="h-5 w-5" />
                 </motion.span>
-              </motion.button>
+              </motion.a>
             </Link>
           </Reveal>
         </div>

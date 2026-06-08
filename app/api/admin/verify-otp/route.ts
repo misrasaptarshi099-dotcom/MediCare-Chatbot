@@ -17,8 +17,12 @@ export async function POST(request: Request) {
     )
   }
 
-  const body = await request.json()
-
+  let body
+  try {
+    body = await request.json()
+  } catch (err) {
+    return NextResponse.json({ error: 'Invalid JSON payload.' }, { status: 400 })
+  }
   // Input validation
   const validation = validateInput(verifyOtpSchema, body)
   if (!validation.success) {

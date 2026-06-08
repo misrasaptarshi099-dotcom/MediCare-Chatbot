@@ -62,8 +62,7 @@ export async function POST(request: Request) {
   const code = String(crypto.randomInt(100000, 1000000))
   const expiresAt = Date.now() + OTP_TTL_MS
 
-  // Persist the OTP in Firestore
-  await saveOtp(normalizedIdentifier, code, expiresAt, 'patient')
+  // Persist the OTP in Firestore ONLY after successful delivery
 
   if (isPhone) {
     // Check if an SMS provider is configured (Twilio, MSG91, etc.)
@@ -80,6 +79,7 @@ export async function POST(request: Request) {
     }
 
     if (process.env.NODE_ENV !== 'production') {
+      await saveOtp(normalizedIdentifier, code, expiresAt, 'patient')
       console.log(`\n\n📱 [MOCK SMS] OTP for ${normalizedIdentifier} is: ${code}\n\n`)
       return NextResponse.json({ success: true, message: 'OTP sent to phone (mock)' })
     }
@@ -127,6 +127,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to send email. Please check server email configuration.' }, { status: 500 })
   }
 
+  await saveOtp(normalizedIdentifier, code, expiresAt, 'patient')
   return NextResponse.json({ success: true })
 }
 
