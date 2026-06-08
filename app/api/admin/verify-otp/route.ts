@@ -34,6 +34,7 @@ export async function POST(request: Request) {
       { status: 429 }
     )
   }
+  const { email, code } = validation.data
 
   const normalizedEmail = email.toLowerCase().trim()
 
