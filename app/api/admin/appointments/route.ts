@@ -1,7 +1,8 @@
 import { requireAdminSession } from '@/lib/admin-auth'
 import { NextResponse } from 'next/server'
 import {
-  getAllAppointments,
+  getAppointments,
+  getAppointment,
   updateAppointment,
   addAppointment,
   getWaitlist,
@@ -49,22 +50,24 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const dateFilter = searchParams.get('date')
   const statusFilter = searchParams.get('status')
+  const cursor = searchParams.get('cursor')
+  const limitStr = searchParams.get('limit')
+  const limit = limitStr ? parseInt(limitStr, 10) : 100
 
   try {
-    const appointments = await getAllAppointments()
-    let filtered = [...appointments]
+    const filters: any = { limit }
+    if (dateFilter && dateFilter !== 'all') filters.date = dateFilter
+    if (statusFilter && statusFilter !== 'all') filters.status = statusFilter
+    if (cursor) filters.startAfterCursor = cursor
 
-    if (dateFilter && dateFilter !== 'all') {
-      filtered = filtered.filter(a => a.date === dateFilter)
-    }
-    if (statusFilter && statusFilter !== 'all') {
-      filtered = filtered.filter(a => a.status === statusFilter)
-    }
+    const appointments = await getAppointments(filters)
+    
+    // We get them sorted by createdAt desc by default from the DB.
+    const nextCursor = appointments.length === limit && appointments.length > 0 
+      ? appointments[appointments.length - 1].createdAt 
+      : null
 
-    const sorted = filtered.sort((a, b) =>
-      new Date(b.date + ' ' + b.time).getTime() - new Date(a.date + ' ' + a.time).getTime()
-    )
-    return NextResponse.json({ appointments: sorted })
+    return NextResponse.json({ appointments, nextCursor })
   } catch (error) {
     console.error('Error fetching appointments:', error)
     return NextResponse.json({ appointments: [] })
@@ -82,8 +85,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'ID and status required' }, { status: 400 })
     }
 
-    const appointments = await getAllAppointments()
-    const apt = appointments.find(a => a.id === id)
+    const apt = await getAppointment(id)
 
     if (!apt) {
       return NextResponse.json({ error: 'Appointment not found' }, { status: 404 })

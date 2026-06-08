@@ -20,8 +20,9 @@ export async function POST(request: Request) {
   try {
     const ip = getClientIp(request)
 
-    // Rate limit: 3 escalation actions per day per IP
-    const check = checkRateLimit(rateLimitKey('escalation-day', ip), 3, 24 * 60 * 60 * 1000)
+    // Rate limit: 3 escalation actions per day per admin (keyed by admin user ID, IP fallback)
+    const rateLimitId = adminUser.id || ip
+    const check = checkRateLimit(rateLimitKey('escalation-day', rateLimitId), 3, 24 * 60 * 60 * 1000)
     if (!check.allowed) {
       return NextResponse.json(
         { error: 'Too many escalation requests today. Please try again tomorrow.' },

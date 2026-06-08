@@ -21,6 +21,9 @@ const store = new Map<string, RateLimitEntry>()
 let callsSincePrune = 0
 const PRUNE_INTERVAL = 100
 
+// Hard cap on store size to prevent DoS via attacker-controlled keys
+const MAX_KEYS = 10_000
+
 function pruneExpired() {
   const now = Date.now()
   for (const [key, entry] of store) {
@@ -28,6 +31,19 @@ function pruneExpired() {
       store.delete(key)
     }
   }
+}
+
+/** Evict the entry closest to expiring when the store is at capacity. */
+function evictOldest() {
+  let oldestKey: string | null = null
+  let oldestResetAt = Infinity
+  for (const [key, entry] of store) {
+    if (entry.resetAt < oldestResetAt) {
+      oldestResetAt = entry.resetAt
+      oldestKey = key
+    }
+  }
+  if (oldestKey) store.delete(oldestKey)
 }
 
 export interface RateLimitResult {
@@ -64,6 +80,10 @@ export function checkRateLimit(
 
   // No existing entry or window has expired — start fresh
   if (!entry || now >= entry.resetAt) {
+    // Enforce hard cap: evict oldest entry if at capacity
+    if (!entry && store.size >= MAX_KEYS) {
+      evictOldest()
+    }
     store.set(key, { count: 1, resetAt: now + windowMs })
     return { allowed: true, remaining: limit - 1, resetAt: now + windowMs }
   }

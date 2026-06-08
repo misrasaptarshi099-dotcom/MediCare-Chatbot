@@ -45,6 +45,10 @@ export default function AdminPatientsPage() {
   const [deleteConfirmName, setDeleteConfirmName] = useState('')
   const [resultMessage, setResultMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
+  // Pagination State
+  const [cursorStack, setCursorStack] = useState<string[]>([])
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+
   // Add Patient State
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [addName, setAddName] = useState('')
@@ -79,13 +83,16 @@ export default function AdminPatientsPage() {
     ))
   }, [search, patients])
 
-  const fetchPatients = async () => {
+  const fetchPatients = async (cursor?: string) => {
     setLoading(true)
     try {
-      const res = await fetch('/api/admin/patients')
+      const url = new URL('/api/admin/patients', window.location.origin)
+      if (cursor) url.searchParams.set('cursor', cursor)
+      const res = await fetch(url.toString())
       const data = await res.json()
       setPatients(data.patients || [])
       setFiltered(data.patients || [])
+      setNextCursor(data.nextCursor || null)
     } catch {
       setPatients([])
     } finally {
@@ -464,6 +471,42 @@ export default function AdminPatientsPage() {
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {(!loading && (filtered.length > 0 || cursorStack.length > 0)) && (
+        <div className="flex items-center justify-between py-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const newStack = [...cursorStack]
+              newStack.pop()
+              const prevCursor = newStack[newStack.length - 1] || undefined
+              setCursorStack(newStack)
+              fetchPatients(prevCursor)
+            }}
+            disabled={cursorStack.length === 0}
+          >
+            Previous
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Page {cursorStack.length + 1}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (nextCursor) {
+                setCursorStack([...cursorStack, nextCursor])
+                fetchPatients(nextCursor)
+              }
+            }}
+            disabled={!nextCursor}
+          >
+            Next
+          </Button>
         </div>
       )}
 

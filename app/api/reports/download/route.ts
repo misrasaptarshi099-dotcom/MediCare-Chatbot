@@ -26,14 +26,19 @@ async function buildDownloadUrl(report: { storagePath?: string; fileUrl?: string
   const safe = (report.fileName || 'report.pdf').replace(/["\\\n\r]/g, '_')
 
   if (report.storagePath) {
-    const file = storage.bucket().file(report.storagePath)
-    const [signedUrl] = await file.getSignedUrl({
-      action: 'read',
-      expires: Date.now() + 5 * 60 * 1000, // 5-minute expiry
-      responseDisposition: `attachment; filename="${safe}"`,
-      responseType: 'application/pdf',
-    })
-    return { signedUrl }
+    try {
+      const file = storage.bucket().file(report.storagePath)
+      const [signedUrl] = await file.getSignedUrl({
+        action: 'read',
+        expires: Date.now() + 5 * 60 * 1000, // 5-minute expiry
+        responseDisposition: `attachment; filename="${safe}"`,
+        responseType: 'application/pdf',
+      })
+      return { signedUrl }
+    } catch (err) {
+      console.error('getSignedUrl failed, falling back to fileUrl:', err)
+      // Fall through to fileUrl fallback below
+    }
   }
 
   // Legacy fallback: no storagePath, proxy from fileUrl
@@ -84,7 +89,10 @@ export async function GET(request: Request) {
 
     const result = await buildDownloadUrl(report)
     if ('signedUrl' in result) {
-      return NextResponse.redirect(result.signedUrl, 307)
+      return NextResponse.redirect(result.signedUrl, {
+        status: 307,
+        headers: { 'Cache-Control': 'private, no-store' },
+      })
     }
 
     return new NextResponse(result.fileBuffer, {
@@ -144,7 +152,10 @@ export async function POST(request: Request) {
 
     const result = await buildDownloadUrl(report)
     if ('signedUrl' in result) {
-      return NextResponse.json({ url: result.signedUrl })
+      return NextResponse.json(
+        { url: result.signedUrl },
+        { headers: { 'Cache-Control': 'private, no-store' } }
+      )
     }
 
     // Legacy fallback: return the file inline since we can't produce a URL

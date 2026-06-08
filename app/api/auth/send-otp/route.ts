@@ -59,7 +59,9 @@ export async function POST(request: Request) {
     // MOCK SMS SENDING
     // In a real production app, you would integrate Twilio, MSG91, AWS SNS here,
     // OR use Firebase Client SDK's signInWithPhoneNumber (which bypasses this endpoint).
-    console.log(`\n\n📱 [MOCK SMS] OTP for ${normalizedIdentifier} is: ${code}\n\n`)
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`\n\n📱 [MOCK SMS] OTP for ${normalizedIdentifier} is: ${code}\n\n`)
+    }
     return NextResponse.json({ success: true, message: 'OTP sent to phone (mock)' })
   }
 

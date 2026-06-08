@@ -14,12 +14,23 @@ import { z } from 'zod'
 
 // ── HTML Sanitizer ────────────────────────────────────────────────────────────
 
+const HTML_ENTITY_MAP: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#x27;',
+  '/': '&#x2F;',
+  '`': '&#96;',
+}
+const HTML_ESCAPE_RE = /[&<>"'`/]/g
+
 /**
- * Strip HTML tags from a string to prevent XSS when the value is later
+ * HTML-encode special characters to prevent XSS when the value is later
  * embedded in Nodemailer HTML templates or admin dashboard views.
  */
 export function sanitizeHtml(text: string): string {
-  return text.replace(/[<>]/g, '').trim()
+  return text.replace(HTML_ESCAPE_RE, (char) => HTML_ENTITY_MAP[char] || char).trim()
 }
 
 // ── Zod Schemas ───────────────────────────────────────────────────────────────

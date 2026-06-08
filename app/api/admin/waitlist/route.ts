@@ -1,6 +1,7 @@
 import { requireAdminSession } from '@/lib/admin-auth'
 import { NextResponse } from 'next/server'
 import { getWaitlist, deleteWaitlistEntry, type WaitlistEntry } from '@/lib/db'
+import { db } from '@/lib/firestore'
 
 // GET — list all waitlist entries (with optional filters)
 export async function GET(request: Request) {
@@ -28,8 +29,8 @@ export async function GET(request: Request) {
       return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     })
 
-    // Attach queue position per slot
-    const allEntries = await getWaitlist() // full list for position calc
+    // Attach queue position per slot — reuse the UNFILTERED fetch for position calc
+    const allEntries = doctorFilter || dateFilter ? await getWaitlist() : entries
     const withPosition = entries.map(entry => {
       const slotEntries = allEntries
         .filter(e => e.doctorId === entry.doctorId && e.date === entry.date && e.time === entry.time)
@@ -57,10 +58,11 @@ export async function DELETE(request: Request) {
   }
 
   try {
-    const entries = await getWaitlist()
-    const exists = entries.find(e => e.id === id)
+    // Direct O(1) document lookup instead of fetching entire collection
+    const docRef = db.collection('waitlist').doc(id)
+    const doc = await docRef.get()
 
-    if (!exists) {
+    if (!doc.exists) {
       return NextResponse.json({ error: 'Entry not found' }, { status: 404 })
     }
 

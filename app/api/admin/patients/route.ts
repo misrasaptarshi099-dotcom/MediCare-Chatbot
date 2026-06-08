@@ -1,7 +1,7 @@
 import { requireAdminSession } from '@/lib/admin-auth'
 import { NextResponse } from 'next/server'
 import {
-  getAllPatients,
+  getPatientsPaginated,
   getAllAppointments,
   getAllChatSessions,
   getCallbackTickets,
@@ -12,13 +12,17 @@ import {
 import { db } from '@/lib/firestore'
 import { adminAuth } from '@/lib/firebase-admin'
 
-// GET — list all unique patients from the patients collection
-export async function GET() {
+export async function GET(request: Request) {
   const adminUser = await requireAdminSession();
   if (!adminUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  const { searchParams } = new URL(request.url)
+  const cursor = searchParams.get('cursor')
+  const limitStr = searchParams.get('limit')
+  const limit = limitStr ? parseInt(limitStr, 10) : 100
+
   try {
-    const patients = await getAllPatients()
+    const patients = await getPatientsPaginated(limit, cursor || undefined)
     const patientMap: Record<string, any> = {}
 
     for (const p of patients) {
@@ -36,13 +40,15 @@ export async function GET() {
         appointmentCount: 0,
         callbackCount: 0,
         chatCount: 0,
+        createdAt: (p as any).createdAt || null
       }
     }
 
-    // From appointments
+    // From appointments (use .select to avoid loading huge message arrays)
     try {
-      const appointments = await getAllAppointments()
-      for (const apt of appointments) {
+      const aptsSnap = await db.collection('appointments').select('patientUid', 'patientEmail').get()
+      aptsSnap.forEach(doc => {
+        const apt = doc.data()
         const uid = apt.patientUid
         if (uid && patientMap[uid]) {
           patientMap[uid].appointmentCount++
@@ -51,13 +57,14 @@ export async function GET() {
           const p = Object.values(patientMap).find(pat => pat.email?.toLowerCase().trim() === e)
           if (p) p.appointmentCount++
         }
-      }
+      })
     } catch {}
 
     // From callback tickets
     try {
-      const tickets = await getCallbackTickets()
-      for (const cb of tickets) {
+      const cbSnap = await db.collection('callbackTickets').select('patientUid', 'patientEmail').get()
+      cbSnap.forEach(doc => {
+        const cb = doc.data()
         const uid = cb.patientUid
         if (uid && patientMap[uid]) {
           patientMap[uid].callbackCount++
@@ -66,21 +73,29 @@ export async function GET() {
            const p = Object.values(patientMap).find(pat => pat.email?.toLowerCase().trim() === e)
            if (p) p.callbackCount++
         }
-      }
+      })
     } catch {}
 
-    // From chat sessions
+    // From chat sessions — uses the lightweight messageCount field (backfilled)
     try {
-      const sessions = await getAllChatSessions()
-      // Chat session IDs are usually the user UID
-      for (const s of sessions) {
-         if (s.uid && patientMap[s.uid]) {
-           patientMap[s.uid].chatCount = s.messages?.length || 0
+      const chatSnap = await db.collection('chatSessions').select('uid', 'messageCount').get()
+      chatSnap.forEach(doc => {
+         const data = doc.data()
+         const uid = data.uid || doc.id
+         if (uid && patientMap[uid]) {
+           patientMap[uid].chatCount = data.messageCount ?? 0
          }
-      }
+      })
     } catch {}
 
-    return NextResponse.json({ patients: Object.values(patientMap) })
+    const patientsList = Object.values(patientMap)
+    
+    // Only return a next cursor if we hit the limit (meaning there MIGHT be more data)
+    const nextCursor = patients.length === limit && patientsList.length > 0 
+      ? patients[patients.length - 1].createdAt 
+      : null
+    
+    return NextResponse.json({ patients: patientsList, nextCursor })
   } catch (err) {
     console.error('Error fetching patients:', err)
     return NextResponse.json({ error: 'Failed to fetch patients' }, { status: 500 })

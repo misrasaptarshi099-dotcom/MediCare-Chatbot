@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import {
   getDoctors,
+  getDoctor,
   addDoctor,
   updateDoctor,
   deleteDoctor,
@@ -64,8 +65,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Doctor ID is required' }, { status: 400 })
     }
 
-    const doctors = await getDoctors()
-    const doctor = doctors.find(d => d.id === id)
+    const doctor = await getDoctor(id)
 
     if (!doctor) {
       return NextResponse.json({ error: 'Doctor not found' }, { status: 404 })
@@ -89,8 +89,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Doctor ID is required' }, { status: 400 })
     }
 
-    const doctors = await getDoctors()
-    const doctor = doctors.find(d => d.id === id)
+    const doctor = await getDoctor(id)
 
     if (!doctor) {
       return NextResponse.json({ error: 'Doctor not found' }, { status: 404 })

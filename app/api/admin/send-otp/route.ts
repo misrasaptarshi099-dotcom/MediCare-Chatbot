@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
+import crypto from 'crypto'
 import {
   getAdminUserByEmail,
   getAllAppointments,
@@ -82,7 +83,7 @@ export async function POST(request: Request) {
   }
 
   // 3. Generate OTP
-  const code = String(Math.floor(100000 + Math.random() * 900000))
+  const code = String(crypto.randomInt(100000, 1000000))
   const expiresAt = Date.now() + OTP_TTL_MS
 
   await saveOtp(normalizedEmail, code, expiresAt, 'admin')

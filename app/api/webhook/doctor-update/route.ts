@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getDoctors, addDoctor, updateDoctor, type Doctor } from '@/lib/db'
+import { getDoctor, addDoctor, updateDoctor, type Doctor } from '@/lib/db'
 import crypto from 'crypto'
 
 export async function POST(request: Request) {
@@ -24,10 +24,8 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { action, doctor } = body
 
-    const doctors = await getDoctors()
-
     if (action === 'update') {
-      const existing = doctors.find(d => d.id === doctor.id)
+      const existing = await getDoctor(doctor.id)
 
       if (existing) {
         // Update existing doctor

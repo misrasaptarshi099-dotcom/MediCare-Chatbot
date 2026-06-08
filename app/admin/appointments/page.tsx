@@ -31,6 +31,10 @@ export default function AppointmentsPage() {
   const [filter, setFilter] = useState<'all' | 'scheduled' | 'completed' | 'cancelled'>('all')
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'info' } | null>(null)
 
+  // Pagination State
+  const [cursorStack, setCursorStack] = useState<string[]>([])
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+
   const showToast = (msg: string, type: 'success' | 'info' = 'success') => {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 5000)
@@ -40,10 +44,13 @@ export default function AppointmentsPage() {
     fetchAppointments()
   }, [])
 
-  const fetchAppointments = async () => {
-    const res = await fetch('/api/admin/appointments')
+  const fetchAppointments = async (cursor?: string) => {
+    const url = new URL('/api/admin/appointments', window.location.origin)
+    if (cursor) url.searchParams.set('cursor', cursor)
+    const res = await fetch(url.toString())
     const data = await res.json()
     setAppointments(data.appointments || [])
+    setNextCursor(data.nextCursor || null)
   }
 
   const updateStatus = async (id: string, status: 'completed' | 'cancelled') => {
@@ -279,6 +286,42 @@ export default function AppointmentsPage() {
           {renderTable(filteredAppointments.filter(apt => categorizeApt(apt.service) === 'xray'))}
         </TabsContent>
       </Tabs>
+
+      {/* Pagination Controls */}
+      {(appointments.length > 0 || cursorStack.length > 0) && (
+        <div className="flex items-center justify-between py-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const newStack = [...cursorStack]
+              newStack.pop()
+              const prevCursor = newStack[newStack.length - 1] || undefined
+              setCursorStack(newStack)
+              fetchAppointments(prevCursor)
+            }}
+            disabled={cursorStack.length === 0}
+          >
+            Previous
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Page {cursorStack.length + 1}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (nextCursor) {
+                setCursorStack([...cursorStack, nextCursor])
+                fetchAppointments(nextCursor)
+              }
+            }}
+            disabled={!nextCursor}
+          >
+            Next
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

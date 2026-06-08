@@ -165,9 +165,14 @@ export async function POST(request: Request) {
       // ── RATE LIMITING: 30 total messages per day per phone number ───────
       const totalCheck = checkRateLimit(rateLimitKey('wa-total-day', incoming.from), 30, 24 * 60 * 60 * 1000)
       if (!totalCheck.allowed) {
-        try {
-          await sendTextMessage(incoming.from, '⚠️ You have reached your daily message limit. Please try again tomorrow.')
-        } catch {}
+        // Only send the warning once per user per day to prevent outbound storms
+        const warnKey = rateLimitKey('wa-warned-total', incoming.from)
+        const warnCheck = checkRateLimit(warnKey, 1, 24 * 60 * 60 * 1000)
+        if (warnCheck.allowed) {
+          try {
+            await sendTextMessage(incoming.from, '⚠️ You have reached your daily message limit. Please try again tomorrow.')
+          } catch {}
+        }
         continue
       }
 
@@ -175,9 +180,14 @@ export async function POST(request: Request) {
       if (incoming.type === 'text') {
         const aiCheck = checkRateLimit(rateLimitKey('wa-ai-day', incoming.from), 15, 24 * 60 * 60 * 1000)
         if (!aiCheck.allowed) {
-          try {
-            await sendTextMessage(incoming.from, '⚠️ You have used all your AI assistant interactions for today. Please try again tomorrow, or call the hospital directly for assistance.')
-          } catch {}
+          // Only send the warning once per user per day to prevent outbound storms
+          const warnKey = rateLimitKey('wa-warned-ai', incoming.from)
+          const warnCheck = checkRateLimit(warnKey, 1, 24 * 60 * 60 * 1000)
+          if (warnCheck.allowed) {
+            try {
+              await sendTextMessage(incoming.from, '⚠️ You have used all your AI assistant interactions for today. Please try again tomorrow, or call the hospital directly for assistance.')
+            } catch {}
+          }
           continue
         }
       }

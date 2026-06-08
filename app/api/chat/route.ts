@@ -341,7 +341,7 @@ export async function POST(request: Request) {
     // ── SHORT-CIRCUIT: All-department coverage query ───────────────────────────
     // This type of query reliably overflows the AI's token budget, so we handle
     // it directly from the database instead of sending it to Gemini.
-    if (isAllDepartmentCoverageQuery(query)) {
+    if (isAllDepartmentCoverageQuery(sanitizedQuery)) {
       const allCoverageResults = await buildAllDepartmentCoverageResults()
       const responseMessage = `Here's a full breakdown of insurance coverage for each department at MediCare. Each card shows which insurers cover that department's services and at what percentage.`
 
@@ -460,7 +460,7 @@ export async function POST(request: Request) {
         const existingMessages = existing?.messages ?? []
 
         const timestamp = Date.now()
-        const userMsg: DbChatMessage = { id: `u-${timestamp}`, type: 'user', content: userQuery, timestamp }
+        const userMsg: DbChatMessage = { id: `u-${timestamp}`, type: 'user', content: sanitizeHtml(userQuery.slice(0, 1000)), timestamp }
 
         let errorReply = "I'm sorry, something went wrong. Please try again."
         if (message.includes('quota') || message.includes('RESOURCE_EXHAUSTED')) {
