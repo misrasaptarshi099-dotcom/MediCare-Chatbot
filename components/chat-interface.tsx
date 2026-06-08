@@ -824,7 +824,7 @@ export function ChatInterface({
         <div>
           <h2 className="font-semibold text-foreground leading-tight">MediCare AI Assistant</h2>
           <p className="text-xs text-muted-foreground flex items-center gap-1">
-            <Sparkles className="h-3 w-3 text-primary" /> Powered by Gemini · Online
+            <Sparkles className="h-3 w-3 text-primary" /> Online
           </p>
         </div>
       </motion.div>

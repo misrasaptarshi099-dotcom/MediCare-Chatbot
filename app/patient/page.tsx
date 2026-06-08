@@ -32,29 +32,7 @@ const fadeUp = {
 
 // ── Portal mesh background ─────────────────────────────────────────────────────
 function PortalMesh() {
-  return (
-    <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-      <div
-        className="absolute inset-0 opacity-[0.025] dark:opacity-[0.04]"
-        style={{
-          backgroundImage: 'linear-gradient(rgba(99,102,241,1) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,1) 1px, transparent 1px)',
-          backgroundSize: '48px 48px',
-        }}
-      />
-      <motion.div
-        className="absolute -top-32 -left-32 w-[min(500px,100vw)] h-[min(500px,100vw)] rounded-full opacity-[0.05] dark:opacity-[0.04]"
-        style={{ background: 'radial-gradient(circle, #6366f1 0%, #3b82f6 50%, transparent 70%)', filter: 'blur(70px)' }}
-        animate={{ scale: [1, 1.08, 1], x: [0, 20, 0] }}
-        transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut' }}
-      />
-      <motion.div
-        className="absolute bottom-0 right-0 w-[min(400px,100vw)] h-[min(400px,100vw)] rounded-full opacity-[0.04] dark:opacity-[0.03]"
-        style={{ background: 'radial-gradient(circle, #8b5cf6 0%, #06b6d4 50%, transparent 70%)', filter: 'blur(60px)' }}
-        animate={{ scale: [1, 1.1, 1], y: [0, -20, 0] }}
-        transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut', delay: 4 }}
-      />
-    </div>
-  )
+  return null
 }
 
 // ── Loading screen ─────────────────────────────────────────────────────────────
@@ -77,7 +55,7 @@ function LoadingScreen() {
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
-            className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-xl shadow-primary/30"
+            className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center shadow-xl shadow-primary/20"
           >
             <Stethoscope className="h-8 w-8 text-white" />
           </motion.div>
@@ -159,8 +137,8 @@ function AppointmentCard({ apt, index, onPaymentSuccess }: { apt: any; index: nu
       initial={{ opacity: 0, y: 16, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ ...SPRING, delay: index * 0.07 }}
-      whileHover={{ y: -2, boxShadow: '0 8px 30px rgba(0,0,0,0.08)' }}
-      className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-border/60 rounded-xl bg-card/70 gap-4 cursor-default"
+      whileHover={{ y: -2, boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}
+      className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-border/60 rounded-2xl bg-card/70 gap-4 cursor-default"
     >
       <div className="flex-1">
         <p className="font-semibold text-foreground">{apt.service}</p>
@@ -217,8 +195,8 @@ function CallbackCard({ cb, index }: { cb: any; index: number }) {
       initial={{ opacity: 0, y: 16, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ ...SPRING, delay: index * 0.07 }}
-      whileHover={{ y: -2, boxShadow: '0 8px 30px rgba(0,0,0,0.08)' }}
-      className="flex flex-col sm:flex-row sm:items-start justify-between p-4 border border-border/60 rounded-xl bg-card/70 gap-4 cursor-default"
+      whileHover={{ y: -2, boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}
+      className="flex flex-col sm:flex-row sm:items-start justify-between p-4 border border-border/60 rounded-2xl bg-card/70 gap-4 cursor-default"
     >
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-foreground">{cb.querySummary || 'Callback Request'}</p>
@@ -317,8 +295,8 @@ function ReportCard({ report, index, uid }: { report: any; index: number; uid: s
       initial={{ opacity: 0, y: 16, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ ...SPRING, delay: index * 0.07 }}
-      whileHover={{ y: -2, boxShadow: '0 8px 30px rgba(0,0,0,0.08)' }}
-      className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-border/60 rounded-xl bg-card/70 gap-4 cursor-default"
+      whileHover={{ y: -2, boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}
+      className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-border/60 rounded-2xl bg-card/70 gap-4 cursor-default"
     >
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-foreground flex items-center gap-2">
@@ -464,100 +442,79 @@ export default function PatientDashboard() {
         >
           <PortalMesh />
 
-          {/* ── Header ─────────────────────────────────────────────────────── */}
+          {/* ── Floating Island Nav ────────────────────────────────────────── */}
           <motion.header
             initial={{ opacity: 0, y: -16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...SPRING, delay: 0.1 }}
-            className="shrink-0 border-b border-border/60 bg-card/80 backdrop-blur-xl z-40"
+            className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[96%] max-w-3xl"
           >
-            <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-              <Link href="/" className="flex items-center gap-2.5 group">
+            <div className="flex items-center justify-between rounded-full border border-border/50 bg-background/80 backdrop-blur-md shadow-lg px-4 py-2">
+              <Link href="/" className="flex items-center gap-2 group shrink-0">
                 <motion.div
                   whileHover={{ rotate: 8, scale: 1.08 }}
                   transition={SPRING}
-                  className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-md shadow-primary/25"
+                  className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"
                 >
                   <Stethoscope className="h-4 w-4 text-white" />
                 </motion.div>
-                <span className="font-semibold text-foreground hidden sm:inline-block group-hover:text-primary transition-colors">
-                  MediCare Portal
+                <span className="font-bold text-foreground hidden sm:block">
+                  MediCare
                 </span>
               </Link>
 
-              <div className="flex items-center gap-3">
-                {/* Profile Pill — links to My Profile page */}
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ ...SPRING, delay: 0.2 }}
-                  className="flex items-center gap-2"
-                >
-                  <Link
-                    href="/patient/profile"
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted border border-border/60 text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors cursor-pointer"
-                  >
-                    <User className="h-3 w-3" />
-                    <span className="font-medium">{patientProfile?.name}</span>
-                  </Link>
-                </motion.div>
-
-                <ThemeToggle />
-
-                <motion.button
-                  whileHover={{ scale: 1.04, backgroundColor: 'hsl(var(--destructive) / 0.1)' }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={handleSignOut}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-destructive rounded-xl border border-destructive/20 hover:border-destructive/40 transition-colors"
-                >
-                  <LogOut className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline-block">Sign Out</span>
-                </motion.button>
-              </div>
-            </div>
-          </motion.header>
-
-          {/* ── Main ───────────────────────────────────────────────────────── */}
-          <main className="flex-1 overflow-hidden container mx-auto p-4 flex flex-col gap-4">
-
-            {/* ── Tab Bar ─────────────────────────────────────────────────── */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ ...SPRING, delay: 0.18 }}
-              className="shrink-0 max-w-2xl mx-auto w-full"
-            >
-              <div className="relative flex items-center bg-muted border border-border rounded-2xl p-1 gap-1 overflow-x-auto no-scrollbar">
+              {/* Tabs */}
+              <div className="flex items-center gap-1 mx-2 overflow-x-auto no-scrollbar">
                 {TABS.map(({ key, label, icon: Icon }) => (
                   <button
                     key={key}
                     onClick={() => setActiveTab(key)}
-                    className="relative flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-sm font-medium z-10 transition-colors min-w-0"
+                    className="relative flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-full text-sm font-medium z-10 transition-colors whitespace-nowrap"
                   >
                     {activeTab === key && (
                       <motion.div
                         layoutId="portal-tab-bubble"
-                        className="absolute inset-0 rounded-xl bg-primary shadow-lg shadow-primary/30"
+                        className="absolute inset-0 rounded-full bg-primary shadow-sm"
                         transition={{ type: 'spring', stiffness: 380, damping: 28, mass: 0.8 }}
                       />
                     )}
                     <motion.div
                       className="relative flex items-center gap-1.5"
                       animate={{
-                        scale: activeTab === key ? 1.04 : 1,
                         color: activeTab === key
                           ? 'hsl(var(--primary-foreground))'
-                          : 'hsl(var(--foreground) / 0.75)',
+                          : 'hsl(var(--muted-foreground))',
                       }}
-                      transition={SPRING}
                     >
                       <Icon className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline-block whitespace-nowrap text-xs md:text-sm">{label}</span>
+                      <span className="hidden md:block text-xs">{label}</span>
                     </motion.div>
                   </button>
                 ))}
               </div>
-            </motion.div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-2 shrink-0">
+                <Link
+                  href="/patient/profile"
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-muted border border-border/60 text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors"
+                >
+                  <User className="h-3 w-3" />
+                  <span className="font-medium hidden sm:block">{patientProfile?.name}</span>
+                </Link>
+                <ThemeToggle />
+                <button
+                  onClick={handleSignOut}
+                  className="p-1.5 text-muted-foreground hover:text-destructive transition-colors"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </motion.header>
+
+          {/* ── Main ───────────────────────────────────────────────────────── */}
+          <main className="flex-1 overflow-hidden container mx-auto px-4 pt-24 pb-4 flex flex-col gap-4">
 
             {/* ── Tab Content ─────────────────────────────────────────────── */}
             <div className="flex-1 relative overflow-hidden">
