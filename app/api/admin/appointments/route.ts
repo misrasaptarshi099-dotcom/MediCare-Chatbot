@@ -125,7 +125,7 @@ export async function PUT(request: Request) {
       }
 
       txn.update(aptRef, updateData)
-      return { apt, oldStatus, changed: true }
+      return { apt: { ...apt, ...updateData }, oldStatus, changed: true }
     })
 
     if (!updateResult) {
@@ -142,7 +142,7 @@ export async function PUT(request: Request) {
 
     return NextResponse.json({
       success: true,
-      appointment: { ...apt, status },
+      appointment: apt,
       promoted: promoted
         ? { name: promoted.patientName, email: promoted.patientEmail }
         : null,

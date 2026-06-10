@@ -181,7 +181,6 @@ export default function HomePage() {
             <ThemeToggle />
             <Link href="/patient" passHref legacyBehavior>
               <motion.a
-                role="button"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
@@ -191,7 +190,6 @@ export default function HomePage() {
             </Link>
             <Link href="/login" passHref legacyBehavior>
               <motion.a
-                role="button"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="px-5 py-2 text-sm font-semibold bg-primary text-primary-foreground rounded-full shadow-md transition-all"
@@ -235,7 +233,6 @@ export default function HomePage() {
           <motion.div variants={fadeUp} className="flex flex-wrap justify-center gap-4">
             <Link href="/patient" passHref legacyBehavior>
               <motion.a
-                role="button"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="flex items-center gap-2.5 px-8 py-4 bg-primary text-primary-foreground font-semibold rounded-full shadow-lg shadow-primary/25 transition-all text-base"
@@ -363,7 +360,6 @@ export default function HomePage() {
             </p>
             <Link href="/patient" passHref legacyBehavior>
               <motion.a
-                role="button"
                 whileHover={{ scale: 1.06, boxShadow: '0 12px 50px rgba(59,130,246,0.45)' }}
                 whileTap={{ scale: 0.97 }}
                 className="group inline-flex items-center gap-3 px-9 py-4 bg-primary text-primary-foreground text-lg font-semibold rounded-2xl shadow-lg shadow-primary/25 transition-all"
