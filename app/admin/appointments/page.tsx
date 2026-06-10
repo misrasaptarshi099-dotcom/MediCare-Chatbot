@@ -76,7 +76,8 @@ export default function AppointmentsPage() {
     } else if (res.ok) {
       showToast(data.message || 'Status updated.', 'info')
     }
-    fetchAppointments()
+    const currentCursor = cursorStack.length > 0 ? cursorStack[cursorStack.length - 1] : undefined
+    fetchAppointments(currentCursor)
   }
 
   // When a status filter is active, the server already returns only matching results.

@@ -87,7 +87,11 @@ export default function AdminPatientsPage() {
     setLoading(true)
     try {
       const url = new URL('/api/admin/patients', window.location.origin)
-      if (cursor) url.searchParams.set('cursor', cursor)
+      if (cursor) {
+        url.searchParams.set('cursor', cursor)
+      } else {
+        setCursorStack([])
+      }
       const res = await fetch(url.toString())
       const data = await res.json()
       setPatients(data.patients || [])

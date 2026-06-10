@@ -377,7 +377,7 @@ export async function getAdminUserByUsername(username: string): Promise<User | n
   const snap = await db.collection('adminUsers').where('username', '==', username).get()
   if (snap.empty) return null
   if (snap.size > 1) {
-    console.error(`SECURITY: Multiple admin users with username "${username}" — refusing to authenticate`)
+    console.error('SECURITY: Multiple admin users found for provided identifier — refusing to authenticate')
     return null
   }
   const doc = snap.docs[0]
@@ -389,7 +389,7 @@ export async function getAdminUserByEmail(email: string): Promise<User | null> {
   const snap = await db.collection('adminUsers').where('email', '==', normalizedEmail).get()
   if (snap.empty) return null
   if (snap.size > 1) {
-    console.error(`SECURITY: Multiple admin users with email "${normalizedEmail}" — refusing to authenticate`)
+    console.error('SECURITY: Multiple admin users found for provided identifier — refusing to authenticate')
     return null
   }
   const doc = snap.docs[0]
@@ -758,10 +758,10 @@ export async function getPatientsPaginated(limit: number, startAfterCursor?: str
   
   if (startAfterCursor) {
     const parts = startAfterCursor.split('|')
-    if (parts.length === 2) {
+    if (parts.length === 2 && !isNaN(Date.parse(parts[0])) && parts[1]) {
       query = query.startAfter(parts[0], parts[1])
     } else {
-      query = query.startAfter(startAfterCursor)
+      console.warn('Invalid cursor provided to getPatientsPaginated, falling back to first page.')
     }
   }
   

@@ -10,7 +10,7 @@ import {
 import { ThemeToggle } from '@/components/theme-toggle'
 
 // ── Spring config ────────────────────────────────────────────────────────────
-const SPRING = { type: 'spring', stiffness: 300, damping: 28, mass: 0.8 } as const
+const SPRING = { type: 'spring', stiffness: 200, damping: 25, mass: 0.9 } as const
 const SPRING_SLOW = { type: 'spring', stiffness: 120, damping: 20 } as const
 
 // ── Stagger helpers ──────────────────────────────────────────────────────────
@@ -46,13 +46,13 @@ function CursorGlow() {
       aria-hidden
     >
       <motion.div
-        className="absolute w-[min(500px,100vw)] h-[min(500px,100vw)] rounded-full"
+        className="absolute w-[min(800px,100vw)] h-[min(800px,100vw)] rounded-full"
         style={{
           left: springX,
           top: springY,
           translateX: '-50%',
           translateY: '-50%',
-          background: 'radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 60%)',
           willChange: 'transform',
         }}
       />
@@ -62,37 +62,7 @@ function CursorGlow() {
 
 // ── Animated Mesh Background ─────────────────────────────────────────────────
 function MeshBackground() {
-  return (
-    <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-      {/* Grid pattern */}
-      <div
-        className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06]"
-        style={{
-          backgroundImage: 'linear-gradient(rgba(99,102,241,1) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,1) 1px, transparent 1px)',
-          backgroundSize: '64px 64px',
-        }}
-      />
-      {/* Gradient blobs */}
-      <motion.div
-        className="absolute -top-40 -left-40 w-[min(800px,100vw)] h-[min(800px,100vw)] rounded-full opacity-[0.06] dark:opacity-[0.04]"
-        style={{ background: 'radial-gradient(circle, #6366f1 0%, #3b82f6 50%, transparent 70%)', filter: 'blur(80px)' }}
-        animate={{ scale: [1, 1.08, 1], x: [0, 30, 0], y: [0, 20, 0] }}
-        transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
-      />
-      <motion.div
-        className="absolute top-1/2 -right-40 w-[min(600px,100vw)] h-[min(600px,100vw)] rounded-full opacity-[0.05] dark:opacity-[0.03]"
-        style={{ background: 'radial-gradient(circle, #8b5cf6 0%, #06b6d4 50%, transparent 70%)', filter: 'blur(70px)' }}
-        animate={{ scale: [1, 1.06, 1], x: [0, -20, 0], y: [0, -30, 0] }}
-        transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut', delay: 3 }}
-      />
-      <motion.div
-        className="absolute bottom-0 left-1/3 w-[min(500px,100vw)] h-[min(500px,100vw)] rounded-full opacity-[0.04] dark:opacity-[0.03]"
-        style={{ background: 'radial-gradient(circle, #10b981 0%, #3b82f6 50%, transparent 70%)', filter: 'blur(70px)' }}
-        animate={{ scale: [1, 1.1, 1], x: [0, 15, 0] }}
-        transition={{ duration: 20, repeat: Infinity, ease: 'easeInOut', delay: 6 }}
-      />
-    </div>
-  )
+  return null
 }
 
 // ── Animated counter ─────────────────────────────────────────────────────────
@@ -136,32 +106,19 @@ function FeatureCard({
       variants={fadeUp}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="group relative rounded-2xl border border-border/60 bg-card/60 backdrop-blur-sm p-6 overflow-hidden cursor-default"
+      className="group relative rounded-2xl border border-border/40 bg-card/40 backdrop-blur-sm p-6 overflow-hidden cursor-default transition-colors hover:border-border/80"
     >
-      {/* Hover glow */}
-      <motion.div
-        className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-        style={{ background: gradient }}
-      />
       {/* Card content */}
       <div className="relative z-10">
         <motion.div
-          animate={{ scale: hovered ? 1.1 : 1, rotate: hovered ? 6 : 0 }}
+          animate={{ scale: hovered ? 1.05 : 1 }}
           transition={SPRING}
-          className="w-12 h-12 rounded-xl flex items-center justify-center mb-4"
-          style={{ background: gradient }}
+          className="w-10 h-10 rounded-xl flex items-center justify-center mb-4 bg-primary/10 text-primary"
         >
-          <Icon className="h-6 w-6 text-white" />
+          <Icon className="h-5 w-5" />
         </motion.div>
         <h3 className="font-semibold text-foreground mb-2 text-base">{title}</h3>
         <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
-        <motion.div
-          animate={{ x: hovered ? 4 : 0, opacity: hovered ? 1 : 0 }}
-          transition={SPRING}
-          className="flex items-center gap-1 mt-4 text-xs font-medium text-primary"
-        >
-          Learn more <ArrowRight className="h-3 w-3" />
-        </motion.div>
       </div>
     </motion.div>
   )
@@ -182,35 +139,8 @@ function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
 }
 
 // ── Typewriter badge ─────────────────────────────────────────────────────────
-const WORDS = ['Instantly', 'Accurately', 'Intelligently', 'With AI']
 function TypewriterBadge() {
-  const [wordIdx, setWordIdx] = useState(0)
-  useEffect(() => {
-    const t = setInterval(() => setWordIdx(i => (i + 1) % WORDS.length), 2200)
-    return () => clearInterval(t)
-  }, [])
-  return (
-    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/30 bg-primary/5 text-xs font-medium text-primary mb-8">
-      <motion.div
-        animate={{ scale: [1, 1.3, 1] }}
-        transition={{ duration: 1.4, repeat: Infinity }}
-        className="w-1.5 h-1.5 rounded-full bg-primary"
-      />
-      Answered{' '}
-      <AnimatePresence mode="wait">
-        <motion.span
-          key={wordIdx}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.3 }}
-          className="font-bold"
-        >
-          {WORDS[wordIdx]}
-        </motion.span>
-      </AnimatePresence>
-    </div>
-  )
+  return null
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
@@ -230,55 +160,42 @@ export default function HomePage() {
 
       {/* ── Navbar ────────────────────────────────────────────────────────── */}
       <motion.header
-        style={{ backdropFilter: `blur(${navBlur}px)` }}
-        className="fixed top-0 left-0 right-0 z-50 border-b border-transparent"
+        className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-5xl"
       >
-        <motion.div
-          style={{
-            background: 'var(--nav-bg, transparent)',
-            borderColor: useTransform(scrollYProgress, [0, 0.05], ['transparent', 'rgba(0,0,0,0.08)'])
-          }}
-          className="absolute inset-0"
-        />
         <motion.div
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ ...SPRING, delay: 0.1 }}
-          className="relative container mx-auto px-4 sm:px-6 py-4 flex items-center justify-between"
+          className="relative rounded-full border border-border/50 bg-background/70 backdrop-blur-md shadow-lg px-6 py-3 flex items-center justify-between"
         >
           <div className="flex items-center gap-3">
-            <motion.div
-              whileHover={{ rotate: 10, scale: 1.1 }}
-              transition={SPRING}
-              className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-md shadow-primary/25"
-            >
+            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
               <Stethoscope className="h-4.5 w-4.5 text-white" style={{ width: 18, height: 18 }} />
-            </motion.div>
+            </div>
             <div>
-              <p className="font-semibold text-foreground leading-none">MediCare Hospital</p>
-              <p className="text-[10px] text-muted-foreground leading-tight">AI-Powered Healthcare</p>
+              <p className="font-bold text-foreground leading-none tracking-tight text-lg">MediCare</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
             <ThemeToggle />
-            <Link href="/patient">
-              <motion.button
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
-                className="px-4 py-2 text-sm font-medium text-foreground/80 hover:text-foreground rounded-xl hover:bg-muted transition-colors"
+            <Link href="/patient" passHref legacyBehavior>
+              <motion.a
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
               >
                 Patient Portal
-              </motion.button>
+              </motion.a>
             </Link>
-            <Link href="/login">
-              <motion.button
-                whileHover={{ scale: 1.03, boxShadow: '0 4px 20px rgba(59,130,246,0.35)' }}
-                whileTap={{ scale: 0.97 }}
-                className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-xl shadow-md shadow-primary/20 transition-all"
+            <Link href="/login" passHref legacyBehavior>
+              <motion.a
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="px-5 py-2 text-sm font-semibold bg-primary text-primary-foreground rounded-full shadow-md transition-all"
               >
-                Admin Login
-              </motion.button>
+                Admin
+              </motion.a>
             </Link>
           </div>
         </motion.div>
@@ -295,63 +212,34 @@ export default function HomePage() {
           animate="show"
           className="max-w-4xl mx-auto"
         >
-          <motion.div variants={fadeIn} className="flex justify-center">
-            <TypewriterBadge />
-          </motion.div>
-
           <motion.h1
             variants={fadeUp}
-            className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight leading-[1.08] mb-6"
+            className="text-6xl sm:text-7xl md:text-8xl font-bold tracking-tight leading-[1.05] mb-8"
           >
-            Your Health Questions,{' '}
-            <span className="relative inline-block">
-              <span className="bg-gradient-to-r from-primary via-violet-500 to-cyan-500 bg-clip-text text-transparent">
-                Answered Instantly
-              </span>
-              <motion.span
-                className="absolute bottom-0 left-0 right-0 h-[3px] rounded-full bg-gradient-to-r from-primary via-violet-500 to-cyan-500"
-                initial={{ scaleX: 0 }}
-                animate={{ scaleX: 1 }}
-                transition={{ delay: 0.8, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-                style={{ transformOrigin: 'left' }}
-              />
+            Health Questions,{' '}
+            <span className="text-primary">
+              Answered Instantly
             </span>
           </motion.h1>
 
           <motion.p
             variants={fadeUp}
-            className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed"
+            className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-12 leading-relaxed"
           >
             Our AI-powered assistant is available 24/7 to help you find doctors,
             check availability, understand insurance coverage, and book appointments.
           </motion.p>
 
           <motion.div variants={fadeUp} className="flex flex-wrap justify-center gap-4">
-            <Link href="/patient">
-              <motion.button
-                whileHover={{ scale: 1.05, boxShadow: '0 8px 40px rgba(59,130,246,0.45)' }}
-                whileTap={{ scale: 0.97 }}
-                className="group flex items-center gap-2.5 px-7 py-3.5 bg-primary text-primary-foreground font-semibold rounded-2xl shadow-lg shadow-primary/30 transition-all text-base"
+            <Link href="/patient" passHref legacyBehavior>
+              <motion.a
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="flex items-center gap-2.5 px-8 py-4 bg-primary text-primary-foreground font-semibold rounded-full shadow-lg shadow-primary/25 transition-all text-base"
               >
                 <MessageSquare className="h-5 w-5" />
-                Start Chat
-                <motion.span
-                  animate={{ x: [0, 4, 0] }}
-                  transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </motion.span>
-              </motion.button>
-            </Link>
-            <Link href="/login">
-              <motion.button
-                whileHover={{ scale: 1.04, backgroundColor: 'hsl(var(--muted))' }}
-                whileTap={{ scale: 0.97 }}
-                className="flex items-center gap-2 px-7 py-3.5 border-2 border-border bg-background text-foreground font-medium rounded-2xl text-base"
-              >
-                <Shield className="h-5 w-5 text-muted-foreground" />
-                Admin Dashboard
-              </motion.button>
+                Start Chatting
+              </motion.a>
             </Link>
           </motion.div>
 
@@ -448,139 +336,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── AI Highlight Banner ────────────────────────────────────────────── */}
-      <section className="py-20 px-4">
-        <div className="container mx-auto max-w-5xl">
-          <Reveal>
-            <motion.div
-              whileHover={{ scale: 1.01 }}
-              transition={SPRING_SLOW}
-              className="relative rounded-3xl overflow-hidden border border-primary/20 bg-gradient-to-br from-primary/5 via-violet-500/5 to-cyan-500/5 p-8 sm:p-12"
-            >
-              {/* Animated background lines */}
-              <div className="absolute inset-0 opacity-[0.07]" style={{
-                backgroundImage: 'repeating-linear-gradient(45deg, rgba(99,102,241,0.5) 0, rgba(99,102,241,0.5) 1px, transparent 0, transparent 50%)',
-                backgroundSize: '20px 20px',
-              }} />
 
-              <div className="relative z-10 flex flex-col sm:flex-row items-center gap-8">
-                <motion.div
-                  animate={{ rotate: [0, 360] }}
-                  transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
-                  className="shrink-0 w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-violet-600 flex items-center justify-center shadow-xl shadow-primary/30"
-                >
-                  <Bot className="h-10 w-10 text-white" />
-                </motion.div>
-                <div className="text-center sm:text-left">
-                  <h3 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
-                    Powered by Gemini AI
-                  </h3>
-                  <p className="text-muted-foreground max-w-xl">
-                    Our AI assistant understands natural language, detects your language automatically,
-                    and responds in kind — making healthcare accessible to everyone.
-                  </p>
-                </div>
-                <div className="shrink-0 ml-auto">
-                  <Link href="/patient">
-                    <motion.button
-                      whileHover={{ scale: 1.05, boxShadow: '0 8px 30px rgba(59,130,246,0.4)' }}
-                      whileTap={{ scale: 0.96 }}
-                      className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground font-semibold rounded-xl shadow-md"
-                    >
-                      Try Now <Zap className="h-4 w-4" />
-                    </motion.button>
-                  </Link>
-                </div>
-              </div>
-            </motion.div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ── Quick Info Grid ────────────────────────────────────────────────── */}
-      <section className="py-20 px-4">
-        <div className="container mx-auto max-w-5xl">
-          <motion.div
-            variants={staggerContainer}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: '-60px' }}
-            className="grid md:grid-cols-3 gap-5"
-          >
-            {/* Visiting Hours */}
-            <motion.div variants={fadeUp} className="group rounded-2xl border border-border/60 bg-card/60 p-6 hover:border-primary/30 hover:bg-primary/5 transition-all duration-300">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <Clock className="h-4.5 w-4.5 text-primary" style={{ width: 18, height: 18 }} />
-                </div>
-                <h3 className="font-semibold text-foreground">Visiting Hours</h3>
-              </div>
-              <div className="space-y-2.5">
-                {[
-                  { day: 'Weekdays', time: '10AM–12PM, 4PM–8PM' },
-                  { day: 'Weekends', time: '10AM–8PM' },
-                  { day: 'ICU', time: '5PM–5:30PM, 8PM–8:30PM' },
-                ].map(({ day, time }) => (
-                  <div key={day} className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">{day}</span>
-                    <span className="font-medium text-foreground">{time}</span>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-
-            {/* Departments */}
-            <motion.div variants={fadeUp} className="group rounded-2xl border border-border/60 bg-card/60 p-6 hover:border-violet-500/30 hover:bg-violet-500/5 transition-all duration-300">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-9 h-9 rounded-xl bg-violet-500/10 flex items-center justify-center">
-                  <Stethoscope className="h-4.5 w-4.5 text-violet-500" style={{ width: 18, height: 18 }} />
-                </div>
-                <h3 className="font-semibold text-foreground">Departments</h3>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {['Orthopedics', 'Cardiology', 'Neurology', 'Pediatrics', 'Radiology'].map((dept, i) => (
-                  <motion.span
-                    key={dept}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    whileInView={{ opacity: 1, scale: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: i * 0.07, ...SPRING }}
-                    whileHover={{ scale: 1.06, y: -2 }}
-                    className="px-3 py-1 bg-secondary text-secondary-foreground rounded-full text-xs font-medium cursor-default"
-                  >
-                    {dept}
-                  </motion.span>
-                ))}
-              </div>
-            </motion.div>
-
-            {/* Insurance */}
-            <motion.div variants={fadeUp} className="group rounded-2xl border border-border/60 bg-card/60 p-6 hover:border-emerald-500/30 hover:bg-emerald-500/5 transition-all duration-300">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                  <Shield className="h-4.5 w-4.5 text-emerald-500" style={{ width: 18, height: 18 }} />
-                </div>
-                <h3 className="font-semibold text-foreground">Insurance Partners</h3>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {['ICICI Lombard', 'Star Health', 'HDFC Ergo', 'Max Bupa', 'Bajaj', 'New India', 'Reliance', 'Tata AIG'].map((ins, i) => (
-                  <motion.span
-                    key={ins}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    whileInView={{ opacity: 1, scale: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: i * 0.05, ...SPRING }}
-                    whileHover={{ scale: 1.05, y: -2 }}
-                    className="px-2.5 py-1 bg-secondary text-secondary-foreground rounded-full text-xs font-medium cursor-default"
-                  >
-                    {ins}
-                  </motion.span>
-                ))}
-              </div>
-            </motion.div>
-          </motion.div>
-        </div>
-      </section>
 
       {/* ── CTA Section ───────────────────────────────────────────────────── */}
       <section className="py-28 px-4">
@@ -594,7 +350,7 @@ export default function HomePage() {
             </motion.div>
             <h2 className="text-3xl sm:text-5xl font-bold text-foreground tracking-tight mb-6 leading-tight">
               Start your health journey{' '}
-              <span className="bg-gradient-to-r from-primary to-violet-500 bg-clip-text text-transparent">
+              <span className="text-primary">
                 today
               </span>
             </h2>
@@ -602,8 +358,8 @@ export default function HomePage() {
               Ask any health question, book appointments, or check your insurance coverage —
               all in seconds, in any language.
             </p>
-            <Link href="/patient">
-              <motion.button
+            <Link href="/patient" passHref legacyBehavior>
+              <motion.a
                 whileHover={{ scale: 1.06, boxShadow: '0 12px 50px rgba(59,130,246,0.45)' }}
                 whileTap={{ scale: 0.97 }}
                 className="group inline-flex items-center gap-3 px-9 py-4 bg-primary text-primary-foreground text-lg font-semibold rounded-2xl shadow-lg shadow-primary/25 transition-all"
@@ -616,7 +372,7 @@ export default function HomePage() {
                 >
                   <ArrowRight className="h-5 w-5" />
                 </motion.span>
-              </motion.button>
+              </motion.a>
             </Link>
           </Reveal>
         </div>

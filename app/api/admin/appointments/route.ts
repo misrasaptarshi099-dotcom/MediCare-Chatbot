@@ -103,36 +103,46 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'ID and status required' }, { status: 400 })
     }
 
-    const apt = await getAppointment(id)
+    const aptRef = db.collection('appointments').doc(id)
 
-    if (!apt) {
+    const updateResult = await db.runTransaction(async (txn) => {
+      const doc = await txn.get(aptRef)
+      if (!doc.exists) return null
+      
+      const apt = { id: doc.id, ...doc.data() } as Appointment
+      const oldStatus = apt.status
+
+      if (oldStatus === status) {
+        return { apt, oldStatus, changed: false }
+      }
+
+      const updateData: Record<string, any> = { status }
+      if (status === 'completed') {
+        updateData.paymentStatus = 'paid'
+      }
+      if (status === 'cancelled' && apt.paymentStatus === 'paid') {
+        updateData.paymentStatus = 'refunded'
+      }
+
+      txn.update(aptRef, updateData)
+      return { apt: { ...apt, ...updateData }, oldStatus, changed: true }
+    })
+
+    if (!updateResult) {
       return NextResponse.json({ error: 'Appointment not found' }, { status: 404 })
     }
 
-    const oldStatus = apt.status
-    const updateData: Record<string, any> = { status }
-
-    // ── Payment status logic ──
-    // If admin marks "completed", assume patient paid upfront/offline → set paid
-    if (status === 'completed') {
-      updateData.paymentStatus = 'paid'
-    }
-    // If admin cancels and it was previously paid → initiate refund
-    if (status === 'cancelled' && apt.paymentStatus === 'paid') {
-      updateData.paymentStatus = 'refunded'
-    }
-
-    await updateAppointment(id, updateData)
+    const { apt, oldStatus, changed } = updateResult
 
     // ── KEY FIX: promote from waitlist whenever admin cancels a scheduled slot ──
     let promoted: WaitlistEntry | null = null
-    if (status === 'cancelled' && oldStatus === 'scheduled') {
+    if (changed && status === 'cancelled' && oldStatus === 'scheduled') {
       promoted = await promoteFromWaitlist(apt.doctorId, apt.date, apt.time)
     }
 
     return NextResponse.json({
       success: true,
-      appointment: { ...apt, status },
+      appointment: apt,
       promoted: promoted
         ? { name: promoted.patientName, email: promoted.patientEmail }
         : null,
