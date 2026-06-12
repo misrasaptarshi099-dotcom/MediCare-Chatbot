@@ -12,7 +12,7 @@ interface User {
 interface AuthContextType {
   user: User | null
   login: (username: string, password: string) => Promise<boolean>
-  logout: () => void
+  logout: () => Promise<void>
   isLoading: boolean
 }
 
@@ -60,9 +60,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await fetch("/api/auth", { method: "DELETE" })
+    } catch (error) {
+      console.error("Failed to clear server session:", error)
+    }
     setUser(null)
-    // Session cookie is cleared server-side via DELETE /api/auth
   }
 
   return (

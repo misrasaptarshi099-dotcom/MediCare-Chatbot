@@ -67,14 +67,33 @@ export async function GET(request: Request) {
     let userWaitlist: (WaitlistEntry & { position: number })[] = []
     try {
       const entries = await getWaitlistByPatientUid(uid)
-      // For each entry, get the full slot queue to compute position
-      const withPositions = await Promise.all(
-        entries.map(async (entry) => {
-          const slotQueue = await getWaitlistForSlot(entry.doctorId, entry.date, entry.time)
-          const position = slotQueue.findIndex(e => e.id === entry.id) + 1
-          return { ...entry, position: position > 0 ? position : slotQueue.length + 1 }
+      
+      const uniqueSlots = new Map<string, { doctorId: string, date: string, time: string }>()
+      for (const entry of entries) {
+        const key = `${entry.doctorId}|${entry.date}|${entry.time}`
+        if (!uniqueSlots.has(key)) {
+          uniqueSlots.set(key, { doctorId: entry.doctorId, date: entry.date, time: entry.time })
+        }
+      }
+
+      const slotResults = await Promise.all(
+        Array.from(uniqueSlots.entries()).map(async ([key, slot]) => {
+          const queue = await getWaitlistForSlot(slot.doctorId, slot.date, slot.time)
+          return { key, queue }
         })
       )
+
+      const slotQueues = new Map<string, WaitlistEntry[]>()
+      for (const res of slotResults) {
+        slotQueues.set(res.key, res.queue)
+      }
+
+      const withPositions = entries.map((entry) => {
+        const key = `${entry.doctorId}|${entry.date}|${entry.time}`
+        const slotQueue = slotQueues.get(key) || []
+        const position = slotQueue.findIndex(e => e.id === entry.id) + 1
+        return { ...entry, position: position > 0 ? position : slotQueue.length + 1 }
+      })
       userWaitlist = withPositions.sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       )

@@ -40,10 +40,6 @@ export default function AppointmentsPage() {
     setTimeout(() => setToast(null), 5000)
   }
 
-  useEffect(() => {
-    fetchAppointments()
-  }, [])
-
   // Reset pagination when filter changes
   useEffect(() => {
     setCursorStack([])

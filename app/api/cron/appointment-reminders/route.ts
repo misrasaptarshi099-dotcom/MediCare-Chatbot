@@ -65,17 +65,34 @@ export async function GET(request: Request) {
         continue
       }
 
+      const docRef = db.collection('sentReminders').doc(apt.id)
+
+      try {
+        await docRef.create({
+          appointmentId: apt.id,
+          state: 'pending',
+          createdAt: new Date().toISOString()
+        })
+      } catch (err: any) {
+        if (err.code === 6) { // ALREADY_EXISTS
+          results.push({ appointmentId: apt.id, email: apt.patientEmail, status: 'skipped' })
+          continue
+        }
+        results.push({ appointmentId: apt.id, email: apt.patientEmail, status: 'failed', error: String(err) })
+        continue
+      }
+
       try {
         await sendAppointmentReminder(apt)
 
-        // Record that we sent this reminder
-        await db.collection('sentReminders').doc(apt.id).set({
-          appointmentId: apt.id,
+        await docRef.update({
+          state: 'sent',
           sentAt: new Date().toISOString(),
         })
 
         results.push({ appointmentId: apt.id, email: apt.patientEmail, status: 'sent' })
       } catch (err) {
+        await docRef.delete().catch(console.error)
         results.push({ appointmentId: apt.id, email: apt.patientEmail, status: 'failed', error: String(err) })
       }
     }

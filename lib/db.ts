@@ -233,10 +233,10 @@ export async function getAppointments(filters?: {
 
   if (filters?.startAfterCursor) {
     const parts = filters.startAfterCursor.split('|')
-    if (parts.length === 2) {
+    if (parts.length === 2 && parts[0] && parts[1]) {
       query = query.startAfter(parts[0], parts[1])
     } else {
-      query = query.startAfter(filters.startAfterCursor)
+      throw new Error('Invalid pagination cursor format')
     }
   }
 
@@ -428,11 +428,17 @@ export async function getOtp(identifier: string, purpose: string = 'patient'): P
  * Verify an OTP code against the stored hash.
  * Returns the OTP entry if the code matches and hasn't expired, null otherwise.
  */
-export async function verifyOtp(identifier: string, code: string, purpose: string = 'patient'): Promise<OtpEntry | null> {
-  const entry = await getOtp(identifier, purpose)
+export async function verifyOtp(identifier: string, code: string, purpose: string = 'patient', rawEntry?: OtpEntry | null): Promise<OtpEntry | null> {
+  const entry = rawEntry !== undefined ? rawEntry : await getOtp(identifier, purpose)
   if (!entry) return null
   if (Date.now() > entry.expiresAt) return null
-  if (entry.code !== hashOtp(code)) return null
+  
+  const expectedHash = Buffer.from(entry.code, 'utf8')
+  const actualHash = Buffer.from(hashOtp(code), 'utf8')
+  
+  if (expectedHash.length !== actualHash.length) return null
+  if (!crypto.timingSafeEqual(expectedHash, actualHash)) return null
+  
   return entry
 }
 
@@ -728,7 +734,9 @@ export async function buildHospitalContext(): Promise<string> {
   // Stale cache — return stale data AND trigger background refresh
   if (_cachedHospitalContext && !_isRefreshing) {
     _isRefreshing = true
-    _refreshHospitalContext().finally(() => { _isRefreshing = false })
+    _refreshHospitalContext()
+      .catch(err => console.error('Failed to refresh hospital context in background:', err))
+      .finally(() => { _isRefreshing = false })
     return _cachedHospitalContext
   }
 

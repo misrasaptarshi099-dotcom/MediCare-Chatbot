@@ -4,7 +4,13 @@ import { adminAuth } from '@/lib/firebase-admin'
 
 export async function POST(request: Request) {
   try {
-    const { identifier, otp, name, isLinking } = await request.json()
+    let body;
+    try {
+      body = await request.json()
+    } catch (e) {
+      return NextResponse.json({ error: 'Malformed JSON' }, { status: 400 })
+    }
+    const { identifier, otp, name, isLinking } = body;
 
     if (!identifier || !otp) {
       return NextResponse.json({ error: 'Identifier and OTP are required' }, { status: 400 })
@@ -41,7 +47,7 @@ export async function POST(request: Request) {
     }
 
     // Verify OTP using SHA-256 hash comparison (never compare plaintext)
-    const verified = await verifyOtp(normalizedIdentifier, otp.trim(), 'patient')
+    const verified = await verifyOtp(normalizedIdentifier, otp.trim(), 'patient', rawEntry)
     if (!verified) {
       return NextResponse.json({ error: 'Incorrect code. Please try again.' }, { status: 400 })
     }

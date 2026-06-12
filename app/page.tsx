@@ -152,7 +152,10 @@ export default function HomePage() {
 
   useEffect(() => {
     fetch('/api/public/stats')
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error('Failed to fetch stats')
+        return r.json()
+      })
       .then(data => {
         setLiveStats({
           doctors: data.doctors || 0,
@@ -265,7 +268,7 @@ export default function HomePage() {
                   {dynamic && !statsLoaded ? (
                     <span className="animate-pulse text-muted-foreground/30">...</span>
                   ) : (
-                    <AnimatedNumber value={value || fallback} suffix={suffix} />
+                    <AnimatedNumber value={value ?? fallback} suffix={suffix} />
                   )}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1 font-medium">{label}</p>

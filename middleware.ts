@@ -15,7 +15,7 @@ import type { NextRequest } from 'next/server'
  *   header matching the app's own host. This prevents cross-origin form submissions
  *   from tricking an admin's browser into performing actions.
  */
-export function proxy(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // ── 1.6: Admin page guard ──────────────────────────────────────────────────
