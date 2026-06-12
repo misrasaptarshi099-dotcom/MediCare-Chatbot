@@ -83,20 +83,25 @@ export default function AdminPatientsPage() {
     ))
   }, [search, patients])
 
-  const fetchPatients = async (cursor?: string) => {
+  const fetchPatients = async (cursorOrEvent?: string | React.SyntheticEvent | Event) => {
+    const cursor = typeof cursorOrEvent === 'string' ? cursorOrEvent : undefined;
     setLoading(true)
     try {
       const url = new URL('/api/admin/patients', window.location.origin)
-      if (cursor) {
+      if (search) {
+        url.searchParams.set('search', search)
+      }
+      if (cursor && !search) {
         url.searchParams.set('cursor', cursor)
-      } else {
+      } else if (!search) {
         setCursorStack([])
       }
+      
       const res = await fetch(url.toString())
       const data = await res.json()
       setPatients(data.patients || [])
       setFiltered(data.patients || [])
-      setNextCursor(data.nextCursor || null)
+      setNextCursor(search ? null : (data.nextCursor || null))
     } catch {
       setPatients([])
     } finally {
@@ -479,7 +484,7 @@ export default function AdminPatientsPage() {
       )}
 
       {/* Pagination Controls */}
-      {(!loading && (filtered.length > 0 || cursorStack.length > 0)) && (
+      {(!loading && (filtered.length > 0 || cursorStack.length > 0) && !search) && (
         <div className="flex items-center justify-between py-4">
           <Button
             variant="outline"

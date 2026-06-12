@@ -231,7 +231,7 @@ function ReportCard({ report, index, uid }: { report: any; index: number; uid: s
       const token = await auth.currentUser?.getIdToken()
       if (!token) {
         newWin?.close()
-        alert('You must be logged in to download reports.')
+        toast.error('You must be logged in to download reports.')
         return
       }
 
@@ -247,7 +247,7 @@ function ReportCard({ report, index, uid }: { report: any; index: number; uid: s
       if (!res.ok) {
         newWin?.close()
         const err = await res.json().catch(() => ({ error: 'Download failed' }))
-        alert(err.error || 'Failed to download report.')
+        toast.error(err.error || 'Failed to download report.')
         return
       }
 
@@ -264,7 +264,7 @@ function ReportCard({ report, index, uid }: { report: any; index: number; uid: s
           }
         } else {
           newWin?.close()
-          alert('Failed to generate download link. Please try again.')
+          toast.error('Failed to generate download link. Please try again.')
         }
       } else {
         // Legacy fallback: server returned the file directly as a blob
@@ -282,7 +282,7 @@ function ReportCard({ report, index, uid }: { report: any; index: number; uid: s
     } catch (err) {
       newWin?.close()
       console.error('Download failed', err)
-      alert('Failed to initiate download.')
+      toast.error('Failed to initiate download.')
     } finally {
       setIsDownloading(false)
     }

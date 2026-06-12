@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { motion, useScroll, useTransform, useSpring, useMotionValue, AnimatePresence } from 'framer-motion'
+import { motion, useScroll, useTransform, useSpring, useMotionValue } from 'framer-motion'
 import {
   MessageSquare, Shield, Calendar, MapPin, Stethoscope, Clock,
   ChevronRight, Zap, Bot, Activity, ArrowRight, Star
@@ -142,9 +142,6 @@ function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function HomePage() {
   const { scrollYProgress } = useScroll()
-  const navOpacity = useTransform(scrollYProgress, [0, 0.05], [0, 1])
-  const navBlurValue = useTransform(scrollYProgress, [0, 0.05], [0, 16])
-  const navBackdrop = useSpring(navBlurValue, { stiffness: 200, damping: 30 })
 
   const heroScale = useTransform(scrollYProgress, [0, 0.2], [1, 0.94])
   const heroOpacity = useTransform(scrollYProgress, [0, 0.2], [1, 0])

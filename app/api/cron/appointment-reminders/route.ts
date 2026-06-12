@@ -17,7 +17,20 @@ export async function GET(request: Request) {
   }
 
   const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${cronSecret}`) {
+  let isAuthorized = false;
+
+  if (authHeader === `Bearer ${cronSecret}`) {
+    isAuthorized = true;
+  } else {
+    // Try admin session fallback for manual UI triggers
+    const { requireAdminSession } = await import('@/lib/admin-auth');
+    const adminUser = await requireAdminSession();
+    if (adminUser) {
+      isAuthorized = true;
+    }
+  }
+
+  if (!isAuthorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

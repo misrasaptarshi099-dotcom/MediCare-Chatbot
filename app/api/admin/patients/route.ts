@@ -49,7 +49,7 @@ export async function GET(request: Request) {
     }
 
     const uids = patients.map(p => p.uid).filter(Boolean)
-    const emails = patients.map(p => p.email?.toLowerCase().trim()).filter(Boolean)
+    const emails = patients.map(p => p.email?.toLowerCase().trim()).filter((e): e is string => !!e)
     const uniqueEmails = Array.from(new Set(emails))
 
     const chunkArray = (arr: string[], size: number) => {
