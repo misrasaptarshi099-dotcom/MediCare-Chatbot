@@ -23,10 +23,14 @@ export async function GET(request: Request) {
     isAuthorized = true;
   } else {
     // Try admin session fallback for manual UI triggers
-    const { requireAdminSession } = await import('@/lib/admin-auth');
-    const adminUser = await requireAdminSession();
-    if (adminUser) {
-      isAuthorized = true;
+    try {
+      const { requireAdminSession } = await import('@/lib/admin-auth');
+      const adminUser = await requireAdminSession();
+      if (adminUser) {
+        isAuthorized = true;
+      }
+    } catch {
+      isAuthorized = false;
     }
   }
 
