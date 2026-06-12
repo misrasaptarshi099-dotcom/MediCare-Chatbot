@@ -16,6 +16,7 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { auth } from '@/lib/firebase'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
 import { PatientProvider } from '@/lib/patient-context'
+import { toast } from 'sonner'
 
 // ── Spring config ─────────────────────────────────────────────────────────────
 const SPRING = { type: 'spring', stiffness: 320, damping: 28, mass: 0.8 } as const
@@ -30,10 +31,7 @@ const fadeUp = {
   show: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { ...SPRING } }
 }
 
-// ── Portal mesh background ─────────────────────────────────────────────────────
-function PortalMesh() {
-  return null
-}
+// ── PortalMesh removed — was dead code (returned null) ──
 
 // ── Loading screen ─────────────────────────────────────────────────────────────
 function LoadingScreen() {
@@ -100,7 +98,7 @@ function AppointmentCard({ apt, index, onPaymentSuccess }: { apt: any; index: nu
     try {
       const token = await auth.currentUser?.getIdToken()
       if (!token) {
-        alert('You must be logged in to make a payment.')
+        toast.warning('You must be logged in to make a payment.')
         return
       }
       const res = await fetch('/api/payments', {
@@ -112,15 +110,15 @@ function AppointmentCard({ apt, index, onPaymentSuccess }: { apt: any; index: nu
         body: JSON.stringify({ appointmentId: apt.id, amount: apt.amount })
       })
       if (res.ok) {
-        alert('Payment successful!')
+        toast.success('Payment successful!')
         onPaymentSuccess?.()
       } else {
         const errorData = await res.json()
-        alert(`Payment failed: ${errorData.error || 'Unknown error'}`)
+        toast.error(`Payment failed: ${errorData.error || 'Unknown error'}`)
       }
     } catch (err: any) {
       console.error('Payment failed', err)
-      alert('Payment failed. Please try again.')
+      toast.error('Payment failed. Please try again.')
     } finally {
       setIsPaying(false)
     }
@@ -233,7 +231,7 @@ function ReportCard({ report, index, uid }: { report: any; index: number; uid: s
       const token = await auth.currentUser?.getIdToken()
       if (!token) {
         newWin?.close()
-        alert('You must be logged in to download reports.')
+        toast.error('You must be logged in to download reports.')
         return
       }
 
@@ -249,7 +247,7 @@ function ReportCard({ report, index, uid }: { report: any; index: number; uid: s
       if (!res.ok) {
         newWin?.close()
         const err = await res.json().catch(() => ({ error: 'Download failed' }))
-        alert(err.error || 'Failed to download report.')
+        toast.error(err.error || 'Failed to download report.')
         return
       }
 
@@ -266,7 +264,7 @@ function ReportCard({ report, index, uid }: { report: any; index: number; uid: s
           }
         } else {
           newWin?.close()
-          alert('Failed to generate download link. Please try again.')
+          toast.error('Failed to generate download link. Please try again.')
         }
       } else {
         // Legacy fallback: server returned the file directly as a blob
@@ -284,7 +282,7 @@ function ReportCard({ report, index, uid }: { report: any; index: number; uid: s
     } catch (err) {
       newWin?.close()
       console.error('Download failed', err)
-      alert('Failed to initiate download.')
+      toast.error('Failed to initiate download.')
     } finally {
       setIsDownloading(false)
     }
@@ -383,7 +381,13 @@ export default function PatientDashboard() {
 
   const fetchPatientData = async (uid: string) => {
     try {
-      const res = await fetch(`/api/patient/data?uid=${encodeURIComponent(uid)}`)
+      // Get Firebase ID token for authenticated API requests
+      const idToken = await auth.currentUser?.getIdToken()
+      if (!idToken) return
+
+      const res = await fetch(`/api/patient/data?uid=${encodeURIComponent(uid)}`, {
+        headers: { Authorization: `Bearer ${idToken}` },
+      })
       if (res.ok) {
         const data = await res.json()
         setPatientData({
@@ -440,8 +444,6 @@ export default function PatientDashboard() {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.4 }}
         >
-          <PortalMesh />
-
           {/* ── Floating Island Nav ────────────────────────────────────────── */}
           <motion.header
             initial={{ opacity: 0, y: -16 }}

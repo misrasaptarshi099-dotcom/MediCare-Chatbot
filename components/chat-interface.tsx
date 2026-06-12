@@ -151,7 +151,7 @@ function BackgroundBlobs() {
 export function ChatInterface({
   initialMessages = []
 }: {
-  initialMessages?: any[]
+  initialMessages?: Message[]
 }) {
   const { patient } = usePatient()
   const [messages, setMessages] = useState<Message[]>([])
@@ -989,6 +989,7 @@ export function ChatInterface({
             whileTap={{ scale: 0.9 }}
             onClick={handleVoiceInput}
             disabled={isLoading}
+            aria-label={isListening ? 'Stop listening' : 'Start voice input'}
             className={`relative flex items-center justify-center w-9 h-9 rounded-xl transition-colors shrink-0 ${
               isListening
                 ? 'bg-red-500 text-white shadow-lg shadow-red-500/40'
@@ -1042,6 +1043,7 @@ export function ChatInterface({
               whileTap={{ scale: 0.88 }}
               onClick={handleSend}
               disabled={isLoading || !input.trim()}
+              aria-label="Send message"
               className={`flex items-center justify-center w-9 h-9 rounded-xl shrink-0 transition-colors ${
                 input.trim() && !isLoading
                   ? 'bg-primary text-primary-foreground shadow-md shadow-primary/30'

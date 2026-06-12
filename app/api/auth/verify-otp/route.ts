@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server'
-import { getOtp, deleteOtp, createOrUpdatePatient, getPatientByUid, resolveIdentity, linkIdentity } from '@/lib/db'
+import { verifyOtp, getOtp, deleteOtp, createOrUpdatePatient, getPatientByUid, resolveIdentity, linkIdentity } from '@/lib/db'
 import { adminAuth } from '@/lib/firebase-admin'
 
 export async function POST(request: Request) {
   try {
-    const { identifier, otp, name, isLinking } = await request.json()
+    let body;
+    try {
+      body = await request.json()
+    } catch (e) {
+      return NextResponse.json({ error: 'Malformed JSON' }, { status: 400 })
+    }
+    const { identifier, otp, name, isLinking } = body;
 
     if (!identifier || !otp) {
       return NextResponse.json({ error: 'Identifier and OTP are required' }, { status: 400 })
@@ -27,19 +33,22 @@ export async function POST(request: Request) {
       }
     }
 
-    const entry = await getOtp(normalizedIdentifier, 'patient')
+    // Check if OTP exists first (for name-required flow, we need to know if *any* OTP is stored)
+    const rawEntry = await getOtp(normalizedIdentifier, 'patient')
 
-    if (!entry) {
+    if (!rawEntry) {
       return NextResponse.json({ error: 'No OTP found for this identifier. Please request a new code.' }, { status: 400 })
     }
 
-    if (Date.now() > entry.expiresAt) {
+    if (Date.now() > rawEntry.expiresAt) {
       // Clean up expired entry
       await deleteOtp(normalizedIdentifier, 'patient')
       return NextResponse.json({ error: 'This code has expired. Please request a new one.' }, { status: 400 })
     }
 
-    if (entry.code !== otp.trim()) {
+    // Verify OTP using SHA-256 hash comparison (never compare plaintext)
+    const verified = await verifyOtp(normalizedIdentifier, otp.trim(), 'patient', rawEntry)
+    if (!verified) {
       return NextResponse.json({ error: 'Incorrect code. Please try again.' }, { status: 400 })
     }
 

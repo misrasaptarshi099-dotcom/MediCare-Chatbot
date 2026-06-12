@@ -233,10 +233,10 @@ export async function getAppointments(filters?: {
 
   if (filters?.startAfterCursor) {
     const parts = filters.startAfterCursor.split('|')
-    if (parts.length === 2) {
+    if (parts.length === 2 && parts[0] && parts[1]) {
       query = query.startAfter(parts[0], parts[1])
     } else {
-      query = query.startAfter(filters.startAfterCursor)
+      throw new Error('Invalid pagination cursor format')
     }
   }
 
@@ -270,7 +270,10 @@ export async function getAppointmentStats(): Promise<{ count: number, recent: Pa
 }
 
 export async function getAppointmentsByPatientUid(patientUid: string): Promise<Appointment[]> {
-  const snap = await db.collection('appointments').where('patientUid', '==', patientUid).get()
+  const snap = await db.collection('appointments')
+    .where('patientUid', '==', patientUid)
+    .orderBy('createdAt', 'desc')
+    .get()
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment))
 }
 
@@ -398,15 +401,45 @@ export async function getAdminUserByEmail(email: string): Promise<User | null> {
 
 // ── OTPs ──────────────────────────────────────────────────────────────────────
 
+import crypto from 'crypto'
+
+/** Hash an OTP code with SHA-256 so the raw code is never stored in Firestore. */
+function hashOtp(code: string): string {
+  return crypto.createHash('sha256').update(code.trim()).digest('hex')
+}
+
 export async function saveOtp(identifier: string, code: string, expiresAt: number, purpose: string = 'patient'): Promise<void> {
   const docId = `${identifier.toLowerCase()}_${purpose}`
-  await db.collection('otps').doc(docId).set({ identifier: identifier.toLowerCase(), code, expiresAt, purpose })
+  await db.collection('otps').doc(docId).set({
+    identifier: identifier.toLowerCase(),
+    code: hashOtp(code),   // store hash, not plaintext
+    expiresAt,
+    purpose,
+  })
 }
 
 export async function getOtp(identifier: string, purpose: string = 'patient'): Promise<OtpEntry | null> {
   const docId = `${identifier.toLowerCase()}_${purpose}`
   const doc = await db.collection('otps').doc(docId).get()
   return doc.exists ? (doc.data() as OtpEntry) : null
+}
+
+/**
+ * Verify an OTP code against the stored hash.
+ * Returns the OTP entry if the code matches and hasn't expired, null otherwise.
+ */
+export async function verifyOtp(identifier: string, code: string, purpose: string = 'patient', rawEntry?: OtpEntry | null): Promise<OtpEntry | null> {
+  const entry = rawEntry !== undefined ? rawEntry : await getOtp(identifier, purpose)
+  if (!entry) return null
+  if (Date.now() > entry.expiresAt) return null
+  
+  const expectedHash = Buffer.from(entry.code, 'utf8')
+  const actualHash = Buffer.from(hashOtp(code), 'utf8')
+  
+  if (expectedHash.length !== actualHash.length) return null
+  if (!crypto.timingSafeEqual(expectedHash, actualHash)) return null
+  
+  return entry
 }
 
 export async function deleteOtp(identifier: string, purpose: string = 'patient'): Promise<void> {
@@ -451,7 +484,12 @@ export async function appendChatMessages(uid: string, newMessages: ChatMessage[]
     
     const combined = [...existingMessages, ...newMessages]
     const pruned = combined.filter(m => m.timestamp >= cutoff)
-    const finalMessages = pruned.slice(-1000) // cap to 1000 messages
+
+    // Cap at 200 messages to stay well within Firestore's 1MB doc limit.
+    // Average chat message is ~500 bytes; 200 msgs ≈ 100KB (safe margin).
+    // For high-volume users, consider migrating to a subcollection model.
+    const MAX_MESSAGES = 200
+    const finalMessages = pruned.slice(-MAX_MESSAGES)
     
     t.set(docRef, {
       uid,
@@ -495,6 +533,110 @@ export async function deleteWaitlistEntry(id: string): Promise<void> {
   await db.collection('waitlist').doc(id).delete()
 }
 
+/**
+ * Get waitlist entries for a specific patient UID.
+ */
+export async function getWaitlistByPatientUid(patientUid: string): Promise<WaitlistEntry[]> {
+  const snap = await db.collection('waitlist').where('patientUid', '==', patientUid).get()
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as WaitlistEntry))
+}
+
+/**
+ * Get all waitlist entries for a specific doctor+date+time slot (for computing queue position).
+ */
+export async function getWaitlistForSlot(doctorId: string, date: string, time: string): Promise<WaitlistEntry[]> {
+  const snap = await db.collection('waitlist')
+    .where('doctorId', '==', doctorId)
+    .where('date', '==', date)
+    .where('time', '==', time)
+    .get()
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as WaitlistEntry))
+}
+
+/**
+ * Fetch appointments matching a patient by UID, email, or phone (for legacy records).
+ * Runs 1–3 targeted Firestore queries instead of a full-table scan, then deduplicates.
+ */
+export async function getAppointmentsByPatientIdentifiers(
+  uid: string,
+  email?: string,
+  phone?: string
+): Promise<Appointment[]> {
+  const queries: Promise<Appointment[]>[] = [getAppointmentsByPatientUid(uid)]
+
+  if (email) {
+    queries.push(
+      db.collection('appointments')
+        .where('patientEmail', '==', email.toLowerCase().trim())
+        .get()
+        .then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment)))
+    )
+  }
+  if (phone) {
+    queries.push(
+      db.collection('appointments')
+        .where('patientPhone', '==', phone)
+        .get()
+        .then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment)))
+    )
+  }
+
+  const results = await Promise.all(queries)
+  // Deduplicate by appointment ID
+  const seen = new Set<string>()
+  const merged: Appointment[] = []
+  for (const batch of results) {
+    for (const apt of batch) {
+      if (!seen.has(apt.id)) {
+        seen.add(apt.id)
+        merged.push(apt)
+      }
+    }
+  }
+  return merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+}
+
+/**
+ * Fetch callback tickets matching a patient by UID, email, or phone (for legacy records).
+ */
+export async function getCallbackTicketsByPatientIdentifiers(
+  uid: string,
+  email?: string,
+  phone?: string
+): Promise<CallbackTicket[]> {
+  const queries: Promise<CallbackTicket[]>[] = [getCallbackTicketsByPatientUid(uid)]
+
+  if (email) {
+    queries.push(
+      db.collection('callbackTickets')
+        .where('patientEmail', '==', email.toLowerCase().trim())
+        .get()
+        .then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() } as CallbackTicket)))
+    )
+  }
+  if (phone) {
+    queries.push(
+      db.collection('callbackTickets')
+        .where('patientPhone', '==', phone)
+        .get()
+        .then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() } as CallbackTicket)))
+    )
+  }
+
+  const results = await Promise.all(queries)
+  const seen = new Set<string>()
+  const merged: CallbackTicket[] = []
+  for (const batch of results) {
+    for (const ticket of batch) {
+      if (!seen.has(ticket.id)) {
+        seen.add(ticket.id)
+        merged.push(ticket)
+      }
+    }
+  }
+  return merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+}
+
 // ── Unanswered Queries (Logs) ─────────────────────────────────────────────────
 
 export async function getUnansweredQueries(): Promise<UnansweredQuery[]> {
@@ -518,7 +660,10 @@ export async function getCallbackTickets(): Promise<CallbackTicket[]> {
 }
 
 export async function getCallbackTicketsByPatientUid(patientUid: string): Promise<CallbackTicket[]> {
-  const snap = await db.collection('callbackTickets').where('patientUid', '==', patientUid).get()
+  const snap = await db.collection('callbackTickets')
+    .where('patientUid', '==', patientUid)
+    .orderBy('createdAt', 'desc')
+    .get()
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as CallbackTicket))
 }
 
@@ -546,19 +691,61 @@ export async function markReminderSent(appointmentId: string): Promise<void> {
 
 // ── Build Hospital Context (for AI prompt) ────────────────────────────────────
 
-// 5-minute in-memory TTL cache for the hospital context string.
+// Stale-while-revalidate in-memory cache for the hospital context string.
 // This data (doctors, departments, services, insurance) is public catalog data
 // that changes rarely, so caching it prevents 100+ Firestore reads per chat message.
+//
+// Pattern:
+//   - If cache is fresh (< TTL), return immediately.
+//   - If cache is stale (> TTL), return stale data AND trigger background refresh.
+//   - If cache is empty, fetch synchronously (cold start).
+//   - Midnight crossover: invalidate cache so TODAY date stays current.
+//
+// NOTE: This is a per-process cache. In multi-instance deployments (e.g. Vercel
+// serverless), each instance maintains its own cache. For shared caching across
+// instances, consider a Redis/Upstash layer.
 let _cachedHospitalContext: string | null = null
 let _hospitalContextExpiresAt = 0
+let _isRefreshing = false
+let _cachedDate: string | null = null // track the date to detect midnight crossover
 const HOSPITAL_CONTEXT_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
+/** Force-invalidate the hospital context cache (call after admin edits doctors/departments/services). */
+export function invalidateHospitalContextCache(): void {
+  _cachedHospitalContext = null
+  _hospitalContextExpiresAt = 0
+  _cachedDate = null
+}
 
 export async function buildHospitalContext(): Promise<string> {
   const now = Date.now()
+  const todayStr = new Date().toISOString().split('T')[0]
+
+  // Invalidate on midnight crossover (TODAY changed)
+  if (_cachedDate && _cachedDate !== todayStr) {
+    invalidateHospitalContextCache()
+  }
+
+  // Fresh cache — return immediately
   if (_cachedHospitalContext && now < _hospitalContextExpiresAt) {
     return _cachedHospitalContext
   }
 
+  // Stale cache — return stale data AND trigger background refresh
+  if (_cachedHospitalContext && !_isRefreshing) {
+    _isRefreshing = true
+    _refreshHospitalContext()
+      .catch(err => console.error('Failed to refresh hospital context in background:', err))
+      .finally(() => { _isRefreshing = false })
+    return _cachedHospitalContext
+  }
+
+  // Cold start — fetch synchronously
+  return await _refreshHospitalContext()
+}
+
+/** Internal: Fetch fresh context from Firestore and update cache. */
+async function _refreshHospitalContext(): Promise<string> {
   const [doctors, departments, visitingHours, insurancePartners, services] = await Promise.all([
     getDoctors(),
     getDepartments(),
@@ -617,6 +804,7 @@ ${svcLines}
 
   _cachedHospitalContext = context
   _hospitalContextExpiresAt = Date.now() + HOSPITAL_CONTEXT_TTL_MS
+  _cachedDate = dateStr
 
   return context
 }
@@ -624,10 +812,10 @@ ${svcLines}
 // ── Lab Reports ───────────────────────────────────────────────────────────────
 
 export async function getLabReports(): Promise<LabReport[]> {
-  const snap = await db.collection('labReports').get()
-  return snap.docs
-    .map(d => ({ id: d.id, ...d.data() } as LabReport))
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  const snap = await db.collection('labReports')
+    .orderBy('createdAt', 'desc')
+    .get()
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as LabReport))
 }
 
 export async function getLabReport(id: string): Promise<LabReport | null> {
@@ -637,10 +825,11 @@ export async function getLabReport(id: string): Promise<LabReport | null> {
 
 export async function getPatientReports(email: string): Promise<LabReport[]> {
   const normalizedEmail = email.toLowerCase().trim()
-  const snap = await db.collection('labReports').where('patientEmail', '==', normalizedEmail).get()
-  return snap.docs
-    .map(d => ({ id: d.id, ...d.data() } as LabReport))
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  const snap = await db.collection('labReports')
+    .where('patientEmail', '==', normalizedEmail)
+    .orderBy('createdAt', 'desc')
+    .get()
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as LabReport))
 }
 
 export async function addLabReport(report: LabReport): Promise<void> {
@@ -869,8 +1058,9 @@ export async function linkAuthProvider(
 // ── Lab Reports by UID ────────────────────────────────────────────────────────
 
 export async function getPatientReportsByUid(uid: string): Promise<LabReport[]> {
-  const snap = await db.collection('labReports').where('patientUid', '==', uid).get()
-  return snap.docs
-    .map(d => ({ id: d.id, ...d.data() } as LabReport))
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  const snap = await db.collection('labReports')
+    .where('patientUid', '==', uid)
+    .orderBy('createdAt', 'desc')
+    .get()
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as LabReport))
 }

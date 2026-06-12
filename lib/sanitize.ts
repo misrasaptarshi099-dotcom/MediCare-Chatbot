@@ -134,11 +134,11 @@ export const patientOtpSchema = z.object({
     .string()
     .min(1, 'Identifier is required')
     .max(254, 'Identifier is too long')
+    .transform(val => val.trim())
     .refine(
       (val) => {
-        const trimmed = val.trim()
         // Valid email or valid phone (digits with optional leading +)
-        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed) || /^\+?[0-9]{10,15}$/.test(trimmed)
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val) || /^\+?[0-9]{10,15}$/.test(val)
       },
       { message: 'Must be a valid email address or phone number' }
     ),

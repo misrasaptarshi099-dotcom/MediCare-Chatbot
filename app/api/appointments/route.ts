@@ -163,8 +163,8 @@ export async function POST(request: Request) {
     const newAppointment: Appointment = {
       id: `apt-${Date.now()}`,
       patientName,
-      patientPhone,
-      patientEmail: patientEmail || '',
+      patientPhone: patientPhone || '',
+      patientEmail: (patientEmail as string) || '',
       patientUid: patientUid || undefined,
       doctorId: resolvedDoctorId,
       doctorName: doctor.name,

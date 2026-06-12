@@ -19,6 +19,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Google account must have an email' }, { status: 400 })
     }
 
+    if (!decodedToken.email_verified) {
+      return NextResponse.json({ error: 'Google email address must be verified.' }, { status: 403 })
+    }
+
     // Check if the patient already exists in our database under this Google UID
     const existingPatient = await getPatientByUid(uid)
 
@@ -47,9 +51,10 @@ export async function POST(request: Request) {
 
           // Issue custom token for the ORIGINAL uid
           const customToken = await adminAuth.createCustomToken(existingUid)
+          const currentProviders = Array.isArray(existingByEmail.authProviders) ? existingByEmail.authProviders : []
           return NextResponse.json({
             uid: existingUid,
-            patient: { ...existingByEmail, authProviders: [...new Set([...existingByEmail.authProviders, 'google'])] },
+            patient: { ...existingByEmail, authProviders: [...new Set([...currentProviders, 'google'])] },
             customToken,
           })
         }

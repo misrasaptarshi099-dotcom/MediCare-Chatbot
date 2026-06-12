@@ -33,7 +33,9 @@
 
 ### 🏢 Enterprise Admin Control Center
 - **Operational Oversight:** Provides hospital staff with full visibility into appointment statuses, department schedules, active waitlists, and medical queue metrics.
+- **Strict Edge Middleware:** Enforces robust CSRF protection and unauthenticated request interception at the network edge (`middleware.ts`), guaranteeing zero data leakage.
 - **Integrated Email Delivery:** Automates clinical report dispatch, critical patient reminders, and auth verification tokens utilizing highly detailed email templates.
+- **Atomic Cron Dispatcher:** Nightly background jobs run concurrently with strict atomic operations to prevent duplicate emails or race conditions across instances.
 
 ---
 

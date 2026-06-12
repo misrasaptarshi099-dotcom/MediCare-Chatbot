@@ -3,35 +3,39 @@ import nodemailer from 'nodemailer'
 import crypto from 'crypto'
 import {
   getAdminUserByEmail,
-  getAllAppointments,
-  getCallbackTickets,
-  getAllChatSessions,
   saveOtp,
   type User,
-  type Appointment,
-  type CallbackTicket,
 } from '@/lib/db'
+import { db } from '@/lib/firestore'
 import { checkRateLimit, rateLimitKey, getClientIp } from '@/lib/rate-limit'
 import { adminOtpSchema, validateInput } from '@/lib/sanitize'
 
 const OTP_TTL_MS = 10 * 60 * 1000
 
-/** Collect all patient emails from appointments, chats, and callback tickets */
-async function getAllPatientEmails(): Promise<Set<string>> {
-  const emails = new Set<string>()
+/**
+ * Check if an email belongs to a patient using targeted Firestore queries.
+ * Checks patients collection first (O(1) index lookup), then falls back
+ * to a single appointments query with limit(1) for legacy records.
+ * Much cheaper than the previous full-table scan approach.
+ */
+async function isPatientEmail(email: string): Promise<boolean> {
+  const normalized = email.toLowerCase().trim()
   try {
-    const appointments = await getAllAppointments()
-    appointments.forEach(a => a.patientEmail && emails.add(a.patientEmail.toLowerCase().trim()))
+    // Check patients collection (indexed by email)
+    const patientSnap = await db.collection('patients')
+      .where('email', '==', normalized)
+      .limit(1)
+      .get()
+    if (!patientSnap.empty) return true
+
+    // Fallback: check appointments for legacy records
+    const aptSnap = await db.collection('appointments')
+      .where('patientEmail', '==', normalized)
+      .limit(1)
+      .get()
+    if (!aptSnap.empty) return true
   } catch {}
-  try {
-    const sessions = await getAllChatSessions()
-    /* chat sessions do not store email directly anymore */
-  } catch {}
-  try {
-    const tickets = await getCallbackTickets()
-    tickets.forEach(t => t.patientEmail && emails.add(t.patientEmail.toLowerCase().trim()))
-  } catch {}
-  return emails
+  return false
 }
 
 export async function POST(request: Request) {
@@ -75,8 +79,7 @@ export async function POST(request: Request) {
 
   if (!adminUser) {
     // 2. Check if it's a patient email — give a specific error
-    const patientEmails = await getAllPatientEmails()
-    if (patientEmails.has(normalizedEmail)) {
+    if (await isPatientEmail(normalizedEmail)) {
       return NextResponse.json({
         error: 'This email is registered as a patient account and cannot be used to access the admin panel. Please use your designated admin email address.',
         isPatientEmail: true,

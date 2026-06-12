@@ -81,7 +81,7 @@ export default function AdminLoginPage() {
       const data = await res.json()
 
       if (res.ok && data.success) {
-        sessionStorage.setItem('hospital_user', JSON.stringify(data.user))
+        // Session cookie is set by the server — no sessionStorage needed
         setSuccess(true)
         setTimeout(() => router.push('/admin'), 800)
       } else {

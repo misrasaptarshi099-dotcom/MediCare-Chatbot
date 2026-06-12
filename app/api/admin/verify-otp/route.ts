@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getOtp, deleteOtp, getAdminUserByEmail } from '@/lib/db'
+import { verifyOtp, deleteOtp, getAdminUserByEmail } from '@/lib/db'
 import { cookies } from 'next/headers'
 import { createAdminSession } from '@/lib/admin-auth'
 import { verifyOtpSchema, validateInput } from '@/lib/sanitize'
@@ -41,16 +41,11 @@ export async function POST(request: Request) {
 
   const normalizedEmail = email.toLowerCase().trim()
 
-  // Validate OTP
-  const entry = await getOtp(normalizedEmail, 'admin')
+  // Verify OTP using SHA-256 hash comparison (never compare plaintext)
+  const entry = await verifyOtp(normalizedEmail, code, 'admin')
 
-  if (!entry || entry.code !== code) {
-    return NextResponse.json({ error: 'Invalid verification code. Please try again.' }, { status: 401 })
-  }
-
-  if (Date.now() > entry.expiresAt) {
-    await deleteOtp(normalizedEmail, 'admin')
-    return NextResponse.json({ error: 'This code has expired. Please request a new one.' }, { status: 401 })
+  if (!entry) {
+    return NextResponse.json({ error: 'Invalid or expired verification code. Please try again.' }, { status: 401 })
   }
 
   // Code is valid — clean it up

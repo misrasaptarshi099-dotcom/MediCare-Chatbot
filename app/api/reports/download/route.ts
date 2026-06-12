@@ -88,8 +88,8 @@ export async function GET(request: Request) {
     }
 
     const result = await buildDownloadUrl(report)
-    if ('signedUrl' in result) {
-      return NextResponse.redirect(result.signedUrl, {
+    if ('signedUrl' in result && result.signedUrl) {
+      return NextResponse.redirect(result.signedUrl as string, {
         status: 307,
         headers: { 'Cache-Control': 'private, no-store' },
       })

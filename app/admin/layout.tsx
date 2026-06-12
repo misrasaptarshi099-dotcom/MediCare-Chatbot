@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { 
@@ -54,6 +54,7 @@ export default function AdminLayout({
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const router = useRouter()
+  const pathname = usePathname()
 
   useEffect(() => {
     checkAuth()
@@ -108,6 +109,7 @@ export default function AdminLayout({
               size="icon" 
               className="lg:hidden ml-auto text-sidebar-foreground"
               onClick={() => setSidebarOpen(false)}
+              aria-label="Close sidebar"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -115,17 +117,27 @@ export default function AdminLayout({
 
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-1">
-            {navItems.map((item) => (
-              <Link key={item.href} href={item.href}>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start gap-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-                </Button>
-              </Link>
-            ))}
+            {navItems.map((item) => {
+              // Exact match for Overview (/admin), prefix match for others
+              const isActive = item.href === '/admin'
+                ? pathname === '/admin'
+                : pathname.startsWith(item.href)
+              return (
+                <Link key={item.href} href={item.href}>
+                  <Button
+                    variant="ghost"
+                    className={`w-full justify-start gap-2 transition-colors ${
+                      isActive
+                        ? 'bg-sidebar-primary/10 text-sidebar-primary font-semibold border-l-2 border-sidebar-primary rounded-l-none'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                    }`}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {item.label}
+                  </Button>
+                </Link>
+              )
+            })}
           </nav>
 
           {/* User Info */}
@@ -158,7 +170,7 @@ export default function AdminLayout({
       <div className="flex-1 flex flex-col min-h-screen">
         {/* Mobile Header */}
         <header className="lg:hidden border-b bg-card p-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
+          <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} aria-label="Open sidebar">
             <Menu className="h-5 w-5" />
           </Button>
           <span className="font-semibold text-foreground">MediCare Admin</span>
