@@ -23,13 +23,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Check for existing session
-    const storedUser = typeof window !== "undefined" ? sessionStorage.getItem("hospital_user") : null
-    if (storedUser) {
-      setUser(JSON.parse(storedUser))
-    }
-    setIsLoading(false)
+    // Verify session server-side instead of trusting sessionStorage
+    checkServerSession()
   }, [])
+
+  const checkServerSession = async () => {
+    try {
+      const res = await fetch("/api/auth")
+      const data = await res.json()
+      if (data.authenticated) {
+        setUser(data.user)
+      }
+    } catch {
+      // Session invalid or network error — user stays null
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const login = async (username: string, password: string): Promise<boolean> => {
     try {
@@ -42,7 +52,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (response.ok) {
         const data = await response.json()
         setUser(data.user)
-        sessionStorage.setItem("hospital_user", JSON.stringify(data.user))
         return true
       }
       return false
@@ -53,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     setUser(null)
-    sessionStorage.removeItem("hospital_user")
+    // Session cookie is cleared server-side via DELETE /api/auth
   }
 
   return (

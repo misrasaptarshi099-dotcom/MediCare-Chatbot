@@ -9,6 +9,8 @@ import {
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-toggle'
 
+const MotionLink = motion.create(Link)
+
 // ── Spring config ────────────────────────────────────────────────────────────
 const SPRING = { type: 'spring', stiffness: 200, damping: 25, mass: 0.9 } as const
 const SPRING_SLOW = { type: 'spring', stiffness: 120, damping: 20 } as const
@@ -60,10 +62,7 @@ function CursorGlow() {
   )
 }
 
-// ── Animated Mesh Background ─────────────────────────────────────────────────
-function MeshBackground() {
-  return null
-}
+// ── MeshBackground removed — was dead code (returned null) ──
 
 // ── Animated counter ─────────────────────────────────────────────────────────
 function AnimatedNumber({ value, suffix = '' }: { value: number; suffix?: string }) {
@@ -138,25 +137,39 @@ function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
   )
 }
 
-// ── Typewriter badge ─────────────────────────────────────────────────────────
-function TypewriterBadge() {
-  return null
-}
+// ── TypewriterBadge removed — was dead code (returned null) ──
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function HomePage() {
   const { scrollYProgress } = useScroll()
-  const navBg = useTransform(scrollYProgress, [0, 0.05], ['rgba(255,255,255,0)', 'rgba(255,255,255,0.85)'])
-  const navBgDark = useTransform(scrollYProgress, [0, 0.05], ['rgba(0,0,0,0)', 'rgba(10,10,10,0.85)'])
-  const navBlur = useTransform(scrollYProgress, [0, 0.05], [0, 16])
+  const navOpacity = useTransform(scrollYProgress, [0, 0.05], [0, 1])
+  const navBlurValue = useTransform(scrollYProgress, [0, 0.05], [0, 16])
+  const navBackdrop = useSpring(navBlurValue, { stiffness: 200, damping: 30 })
 
   const heroScale = useTransform(scrollYProgress, [0, 0.2], [1, 0.94])
   const heroOpacity = useTransform(scrollYProgress, [0, 0.2], [1, 0])
 
+  // Fetch real counts from the public stats API (no auth needed, counts only)
+  const [liveStats, setLiveStats] = useState({ doctors: 0, insurers: 0, services: 0 })
+  const [statsLoaded, setStatsLoaded] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/public/stats')
+      .then(r => r.json())
+      .then(data => {
+        setLiveStats({
+          doctors: data.doctors || 0,
+          insurers: data.insurers || 0,
+          services: data.services || 0,
+        })
+        setStatsLoaded(true)
+      })
+      .catch(() => setStatsLoaded(true))
+  }, [])
+
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <CursorGlow />
-      <MeshBackground />
 
       {/* ── Navbar ────────────────────────────────────────────────────────── */}
       <motion.header
@@ -179,24 +192,22 @@ export default function HomePage() {
 
           <div className="flex items-center gap-4">
             <ThemeToggle />
-            <Link href="/patient" passHref legacyBehavior>
-              <motion.a
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Patient Portal
-              </motion.a>
-            </Link>
-            <Link href="/login" passHref legacyBehavior>
-              <motion.a
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="px-5 py-2 text-sm font-semibold bg-primary text-primary-foreground rounded-full shadow-md transition-all"
-              >
-                Admin
-              </motion.a>
-            </Link>
+            <MotionLink
+              href="/patient"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Patient Portal
+            </MotionLink>
+            <MotionLink
+              href="/login"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="px-5 py-2 text-sm font-semibold bg-primary text-primary-foreground rounded-full shadow-md transition-all"
+            >
+              Admin
+            </MotionLink>
           </div>
         </motion.div>
       </motion.header>
@@ -231,16 +242,15 @@ export default function HomePage() {
           </motion.p>
 
           <motion.div variants={fadeUp} className="flex flex-wrap justify-center gap-4">
-            <Link href="/patient" passHref legacyBehavior>
-              <motion.a
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="flex items-center gap-2.5 px-8 py-4 bg-primary text-primary-foreground font-semibold rounded-full shadow-lg shadow-primary/25 transition-all text-base"
-              >
-                <MessageSquare className="h-5 w-5" />
-                Start Chatting
-              </motion.a>
-            </Link>
+            <MotionLink
+              href="/patient"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="flex items-center gap-2.5 px-8 py-4 bg-primary text-primary-foreground font-semibold rounded-full shadow-lg shadow-primary/25 transition-all text-base"
+            >
+              <MessageSquare className="h-5 w-5" />
+              Start Chatting
+            </MotionLink>
           </motion.div>
 
           {/* Stats strip */}
@@ -249,13 +259,17 @@ export default function HomePage() {
             className="mt-16 grid grid-cols-3 gap-6 max-w-lg mx-auto"
           >
             {[
-              { value: 50, suffix: '+', label: 'Doctors' },
-              { value: 24, suffix: '/7', label: 'Available' },
-              { value: 8, suffix: '+', label: 'Insurers' },
-            ].map(({ value, suffix, label }) => (
-              <div key={label} className="text-center">
-                <p className="text-3xl font-bold text-foreground tracking-tight">
-                  <AnimatedNumber value={value} suffix={suffix} />
+              { value: liveStats.doctors, fallback: 50, suffix: '+', label: 'Doctors', dynamic: true },
+              { value: 24, fallback: 24, suffix: '/7', label: 'Available', dynamic: false },
+              { value: liveStats.insurers, fallback: 8, suffix: '+', label: 'Insurers', dynamic: true },
+            ].map(({ value, fallback, suffix, label, dynamic }) => (
+              <div key={label} className="text-center min-w-[100px]">
+                <p className="text-3xl font-bold text-foreground tracking-tight h-9 flex items-center justify-center">
+                  {dynamic && !statsLoaded ? (
+                    <span className="animate-pulse text-muted-foreground/30">...</span>
+                  ) : (
+                    <AnimatedNumber value={value || fallback} suffix={suffix} />
+                  )}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1 font-medium">{label}</p>
               </div>
@@ -358,22 +372,21 @@ export default function HomePage() {
               Ask any health question, book appointments, or check your insurance coverage —
               all in seconds, in any language.
             </p>
-            <Link href="/patient" passHref legacyBehavior>
-              <motion.a
-                whileHover={{ scale: 1.06, boxShadow: '0 12px 50px rgba(59,130,246,0.45)' }}
-                whileTap={{ scale: 0.97 }}
-                className="group inline-flex items-center gap-3 px-9 py-4 bg-primary text-primary-foreground text-lg font-semibold rounded-2xl shadow-lg shadow-primary/25 transition-all"
+            <MotionLink
+              href="/patient"
+              whileHover={{ scale: 1.06, boxShadow: '0 12px 50px rgba(59,130,246,0.45)' }}
+              whileTap={{ scale: 0.97 }}
+              className="group inline-flex items-center gap-3 px-9 py-4 bg-primary text-primary-foreground text-lg font-semibold rounded-2xl shadow-lg shadow-primary/25 transition-all"
+            >
+              <MessageSquare className="h-5 w-5" />
+              Get Started Free
+              <motion.span
+                animate={{ x: [0, 5, 0] }}
+                transition={{ duration: 1.1, repeat: Infinity, ease: 'easeInOut' }}
               >
-                <MessageSquare className="h-5 w-5" />
-                Get Started Free
-                <motion.span
-                  animate={{ x: [0, 5, 0] }}
-                  transition={{ duration: 1.1, repeat: Infinity, ease: 'easeInOut' }}
-                >
-                  <ArrowRight className="h-5 w-5" />
-                </motion.span>
-              </motion.a>
-            </Link>
+                <ArrowRight className="h-5 w-5" />
+              </motion.span>
+            </MotionLink>
           </Reveal>
         </div>
       </section>

@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import {
   buildHospitalContext,
-  getAllAppointments,
+  getAppointments,
+  getAppointmentsByPatientUid,
   addUnansweredQuery,
   getChatSession,
   appendChatMessages,
@@ -119,9 +120,9 @@ async function buildAllDepartmentCoverageResults() {
 async function getBookedSlotsContext(): Promise<string> {
   try {
     const today = new Date().toISOString().split('T')[0]
-    const appointments = await getAllAppointments()
-    const todayBooked = appointments
-      .filter(a => a.date === today && a.status === 'scheduled')
+    // Targeted query: only today's scheduled appointments (not a full-table scan)
+    const todayAppointments = await getAppointments({ date: today, status: 'scheduled' })
+    const todayBooked = todayAppointments
       .map(a => `  • ${a.doctorName} at ${a.time} (booked)`)
     return todayBooked.length
       ? `\n=== ALREADY BOOKED TODAY ===\n${todayBooked.join('\n')}`
@@ -379,10 +380,9 @@ export async function POST(request: Request) {
     let patientAppointmentsContext = ''
     if (effectiveUid) {
       try {
-        const appointments = await getAllAppointments()
-        const patientApts = appointments.filter(
-          a => (a.patientUid === effectiveUid || (body.email && a.patientEmail?.toLowerCase() === body.email?.toLowerCase())) && a.status === 'scheduled'
-        )
+        // Targeted query: only this patient's appointments (not a full-table scan)
+        const patientApts = (await getAppointmentsByPatientUid(effectiveUid))
+          .filter(a => a.status === 'scheduled')
         if (patientApts.length > 0) {
           const lines = patientApts.map(a =>
             `  id:${a.id} | ${a.doctorName} | ${a.date} at ${a.time} | ${a.service} | status:${a.status}`

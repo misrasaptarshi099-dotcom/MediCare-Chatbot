@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
-import { getAllAppointments, type Appointment } from '@/lib/db'
+import { getAppointments, type Appointment } from '@/lib/db'
 import { sendAppointmentReminder } from '@/lib/reminder-email'
 import { db } from '@/lib/firestore'
 
@@ -9,9 +9,14 @@ import { db } from '@/lib/firestore'
 // The real nightly cron runs on Firebase Cloud Functions (9-min timeout).
 // This is a convenience endpoint for manual triggers only.
 export async function GET(request: Request) {
-  // Simple auth check
+  // Auth check — require CRON_SECRET env var (no hardcoded fallback)
+  const cronSecret = process.env.CRON_SECRET
+  if (!cronSecret) {
+    console.error('CRON_SECRET environment variable is not set')
+    return NextResponse.json({ error: 'Cron endpoint is not configured' }, { status: 500 })
+  }
+
   const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET || 'medicare-cron-2026'
   if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -25,16 +30,19 @@ export async function GET(request: Request) {
     tomorrow.setDate(tomorrow.getDate() + 1)
     const tomorrowStr = tomorrow.toISOString().split('T')[0]
 
-    // Get all scheduled appointments for tomorrow
-    const appointments = await getAllAppointments()
-    const tomorrowApts = appointments.filter(
-      (a) => a.date === tomorrowStr && a.status === 'scheduled' && a.patientEmail
-    )
+    // Get scheduled appointments for tomorrow (targeted Firestore query — not a full-table scan)
+    const tomorrowApts = (await getAppointments({ date: tomorrowStr, status: 'scheduled' }))
+      .filter(a => a.patientEmail) // only those with email
 
-    // Check which reminders have already been sent
-    const remindersSnap = await db.collection('sentReminders').get()
-    const sentIds = new Set<string>()
-    remindersSnap.forEach((doc) => sentIds.add(doc.data().appointmentId))
+    // Check which reminders have already been sent (targeted lookups by appointment ID)
+    const reminderChecks = await Promise.all(
+      tomorrowApts.map(apt =>
+        db.collection('sentReminders').doc(apt.id).get()
+      )
+    )
+    const sentIds = new Set<string>(
+      reminderChecks.filter(d => d.exists).map(d => d.id)
+    )
 
     const results: { appointmentId: string; email: string; status: 'sent' | 'skipped' | 'failed'; error?: string }[] = []
 

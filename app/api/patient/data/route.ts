@@ -1,24 +1,42 @@
 export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
+import { adminAuth } from '@/lib/firebase-admin'
 import {
-  getAllAppointments,
-  getCallbackTickets,
+  getAppointmentsByPatientIdentifiers,
+  getCallbackTicketsByPatientIdentifiers,
   getChatSession,
-  getWaitlist,
+  getWaitlistByPatientUid,
+  getWaitlistForSlot,
   getPatientReportsByUid,
   getPatientByUid,
-  type Appointment,
-  type CallbackTicket,
   type WaitlistEntry,
   type LabReport,
 } from '@/lib/db'
 
 export async function GET(request: Request) {
+  // ── AUTH: Verify Firebase ID token ──────────────────────────────────────────
+  const authHeader = request.headers.get('Authorization')
+  if (!authHeader?.startsWith('Bearer ')) {
+    return NextResponse.json({ error: 'Missing or invalid authorization header' }, { status: 401 })
+  }
+
+  let decodedToken
+  try {
+    decodedToken = await adminAuth.verifyIdToken(authHeader.split('Bearer ')[1])
+  } catch {
+    return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
+  }
+
   const { searchParams } = new URL(request.url)
   const uid = searchParams.get('uid')
 
   if (!uid) {
     return NextResponse.json({ error: 'UID is required' }, { status: 400 })
+  }
+
+  // Ensure the authenticated user is only accessing their own data
+  if (decodedToken.uid !== uid) {
+    return NextResponse.json({ error: 'Forbidden: uid mismatch' }, { status: 403 })
   }
 
   try {
@@ -28,64 +46,41 @@ export async function GET(request: Request) {
     }
 
     const email = patient.email?.toLowerCase().trim()
+    const phone = patient.phone
 
-    // Appointments (match by patientUid or fallback to email if old record)
-    let userAppointments: Appointment[] = []
-    try {
-      const appointments = await getAllAppointments()
-      userAppointments = appointments
-        .filter(apt => {
-          if (apt.patientUid === uid) return true
-          if (email && apt.patientEmail?.toLowerCase().trim() === email) return true
-          if (patient.phone && apt.patientPhone === patient.phone) return true
-          return false
-        })
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    } catch {}
+    // Appointments — targeted queries by UID + email + phone fallback (no full-table scan)
+    const userAppointments = await getAppointmentsByPatientIdentifiers(uid, email, phone)
+      .catch(() => [])
 
-    // Callbacks
-    let userCallbacks: CallbackTicket[] = []
-    try {
-      const tickets = await getCallbackTickets()
-      userCallbacks = tickets
-        .filter(cb => {
-          if (cb.patientUid === uid) return true
-          if (email && cb.patientEmail?.toLowerCase().trim() === email) return true
-          if (patient.phone && cb.patientPhone === patient.phone) return true
-          return false
-        })
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    } catch {}
+    // Callbacks — targeted queries by UID + email + phone fallback
+    const userCallbacks = await getCallbackTicketsByPatientIdentifiers(uid, email, phone)
+      .catch(() => [])
 
-    // Chats
+    // Chats — already UID-scoped
     let userChats: { id: string, type: string, content: string, timestamp: number }[] = []
     try {
       const session = await getChatSession(uid)
       if (session?.messages) userChats = session.messages
     } catch {}
 
-    // Waitlist entries
+    // Waitlist entries — targeted query by UID, then compute positions per-slot
     let userWaitlist: (WaitlistEntry & { position: number })[] = []
     try {
-      const waitlist = await getWaitlist()
-      userWaitlist = waitlist
-        .map(entry => {
-          const slotQueue = waitlist.filter(
-            e => e.doctorId === entry.doctorId && e.date === entry.date && e.time === entry.time
-          )
+      const entries = await getWaitlistByPatientUid(uid)
+      // For each entry, get the full slot queue to compute position
+      const withPositions = await Promise.all(
+        entries.map(async (entry) => {
+          const slotQueue = await getWaitlistForSlot(entry.doctorId, entry.date, entry.time)
           const position = slotQueue.findIndex(e => e.id === entry.id) + 1
-          return { ...entry, position }
+          return { ...entry, position: position > 0 ? position : slotQueue.length + 1 }
         })
-        .filter(e => {
-          if (e.patientUid === uid) return true
-          if (email && e.patientEmail?.toLowerCase().trim() === email) return true
-          if (patient.phone && e.patientPhone === patient.phone) return true
-          return false
-        })
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      )
+      userWaitlist = withPositions.sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )
     } catch {}
 
-    // Reports — strict UID-based as requested
+    // Reports — strict UID-based
     let userReports: LabReport[] = []
     try {
       userReports = await getPatientReportsByUid(uid)
